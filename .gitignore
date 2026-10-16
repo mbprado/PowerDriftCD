@@ -9,6 +9,7 @@
 *.bios
 roms/
 bios/
+BIOS/
 reference-roms/
 assets/proprietary/
 assets/extracted/

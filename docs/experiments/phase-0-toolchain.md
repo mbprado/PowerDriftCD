@@ -1,6 +1,6 @@
 # Phase 0 — Toolchain, emulators and automated data collection
 
-**Status: IN PROGRESS (2026-10-16).** See [the smoke test record](2026-10-16-phase-0-smoke.md), [toolchain evaluation](toolchain-evaluation.md), [emulator comparison](emulator-comparison.md), and [automation feasibility](automation-feasibility.md). BIOS-backed boot and debugger checks remain open.
+**Status: IN PROGRESS (2026-10-16).** See [the initial smoke test](2026-10-16-phase-0-smoke.md), [BIOS-backed follow-up](2026-10-16-bios-backed-emulator-check.md), [toolchain evaluation](toolchain-evaluation.md), [emulator comparison](emulator-comparison.md), and [automation feasibility](automation-feasibility.md). **Verified by execution:** two independent emulators reached the EU BIOS UI, and BlastEm exposed both 68000 debuggers. **Unsupported:** disc IP execution and hardware boot. The renderer gate remains closed.
 
 ## Goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
