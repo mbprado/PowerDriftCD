@@ -1,0 +1,28 @@
+{
+  "test_id": "banked_curve_001",
+  "status": "NOT RUN",
+  "evidence_level": "L0",
+  "git_commit": null,
+  "build_id": null,
+  "host_os": null,
+  "host_arch": null,
+  "emulator": null,
+  "emulator_version": null,
+  "disc_image_sha256": null,
+  "scenario_seed": 0,
+  "frames_requested": 600,
+  "frames_executed": null,
+  "video_mode": "NTSC",
+  "target_fps": 30,
+  "measurements": {
+    "main_cpu_cycles": null,
+    "sub_cpu_cycles": null,
+    "asic_cycles": null,
+    "word_ram_swaps": null,
+    "vdp_transfer_bytes": null,
+    "deadline_misses": null
+  },
+  "measurement_provenance": {},
+  "artifact_paths": [],
+  "notes": "Illustrative schema only; no measurements performed."
+}
