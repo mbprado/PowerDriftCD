@@ -1,0 +1,37 @@
+# Proprietary firmware/ROMs and local reference data
+*.bin
+*.cue
+*.iso
+*.chd
+*.mdf
+*.smd
+*.rom
+*.bios
+roms/
+bios/
+reference-roms/
+assets/proprietary/
+assets/extracted/
+
+# Build outputs and emulator-local state
+build/
+dist/
+out/
+*.elf
+*.o
+*.a
+*.map
+*.lst
+*.sym
+*.sav
+*.srm
+*.state
+*.log
+*.trace
+coverage/
+.cache/
+.DS_Store
+__pycache__/
+*.pyc
+
+# Keep test evidence records/reports checked in intentionally; use git add -f for reviewed traces as needed
