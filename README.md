@@ -1,0 +1,39 @@
+# Power Drift CD
+
+**Mission:** develop the most arcade-faithful Power Drift conversion achievable on an **unmodified Sega Mega Drive/Genesis + Sega CD/Mega CD**, using modern engineering, rigorous measurement, and offline precomputation.
+
+**Status:** Phase 0 — toolchain and emulator feasibility. No running port or measured performance claims yet.
+
+## Principles
+- Original console hardware is the target; no expansion CPU/RAM or emulator-only shortcuts.
+- Arcade-feel first: banked tracks, elevation, camera motion, controls, opponents.
+- Benchmark hardware-relative timing, Word RAM handoff, graphics ASIC, VDP transfers, and frame pacing before choosing an engine architecture.
+- macOS first, Linux welcome for debug/automation; Windows requires explicit approval.
+- Codex may build, instrument, execute deterministic tests, and report data; **never invent results**.
+- All game ROMs, BIOS images, and extracted copyrighted assets stay outside this repository.
+
+## Getting started
+1. Read [project rules](docs/project-rules.md) and [Codex agent rules](AGENTS.md).
+2. Follow [Phase 0 plan](docs/experiments/phase-0-toolchain.md).
+3. Record findings in [test evidence format](docs/testing.md).
+4. Review the initial GitHub issue before writing game engine code.
+
+## Roadmap
+0. Toolchain + debugger + emulator evaluation
+1. Sega CD hardware characterization
+2. Banking/elevation road renderer
+3. Sprite/object renderer
+4. Combined renderer and profiling
+5. Arcade-reference data adaptation
+6. Playable racing demonstration
+7. Complete game, hardware validation, release
+
+## Repository layout
+- `docs/` — design decisions, experiments, hardware notes
+- `src/` — eventual console engine (main CPU, sub CPU, graphics, shared)
+- `tools/` — host-side generation and measurement tooling
+- `tests/` — deterministic scenarios and regression tests
+- `scripts/` — reproducible build/test entry points
+- `assets/` — **original or newly generated** redistributable assets only
+
+This project is independent homebrew research; it is not affiliated with Sega.
