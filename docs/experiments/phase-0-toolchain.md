@@ -1,6 +1,6 @@
 # Phase 0 — Toolchain, emulators and automated data collection
 
-**Status: NOT STARTED.** This is an assignment brief, not a report of completed tests.
+**Status: IN PROGRESS (2026-10-16).** See [the smoke test record](2026-10-16-phase-0-smoke.md), [toolchain evaluation](toolchain-evaluation.md), [emulator comparison](emulator-comparison.md), and [automation feasibility](automation-feasibility.md). BIOS-backed boot and debugger checks remain open.
 
 ## Goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
