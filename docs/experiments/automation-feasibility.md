@@ -22,7 +22,7 @@ python3 scripts/capture-emulator.py \
 ## Proposed deterministic run
 
 1. **Hypothesis:** an independently authored startup path can make the owner-supplied BIOS transfer control to the original-code IP. Use a fixed region, BIOS SHA-256, ISO SHA-256, emulator commit/version and fixed configuration. BIOS content stays in ignored local storage. **Verified by execution:** the current image reaches the BIOS UI but not the IP marker.
-2. **Expected acceptance:** capture main-CPU and sub-CPU PC/register state, set a sub-CPU breakpoint at IP entry, step the `move.l`, and read `D0 = 0x50443030`. Save raw debugger transcript and screenshot. If a debugger cannot expose the sub CPU, record `INCONCLUSIVE` for that capability.
+2. **Expected acceptance:** capture main-CPU and sub-CPU PC/register state, set a main-CPU breakpoint at IP entry, step the `move.l`, and read `D0 = 0x50443030`; separately prove execution of an original sub-CPU SP. Save raw debugger transcript and screenshot. If a debugger cannot expose the sub CPU, record `INCONCLUSIVE` for that capability.
 3. **Graphics counters:** run separate synthetic transactions that change one Word RAM owner flag, one ASIC operation and one VDP transfer. Record register addresses and state before/after. Classify each value as emulated cycles, host wall time, or unknown. A screenshot alone does not prove timing.
 4. **Cross-check:** repeat the same image and fixed frame/input count in a second independent emulator. Record both emulator versions/commits and image checksum. If one needs CHD, record the conversion command and CHD checksum. Compare observable state and video, then test stock hardware separately.
 

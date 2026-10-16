@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Build a deterministic, original-code Sega CD Phase 0 boot *candidate*.
 
-This emits a 2048-byte-sector ISO and CUE. It does not supply Sega's
-region-dependent security program. Actual boot requires emulator execution.
+This emits a 2048-byte-sector ISO and CUE containing original IP and SP code.
+It does not supply Sega's region-dependent security program. Actual boot
+requires emulator execution.
 """
 
 import argparse
@@ -42,9 +43,11 @@ def put_text(data, start, size, value):
     data[start:start + size] = encoded.ljust(size, b" ")
 
 
-def build(ip):
+def build(ip, sp):
     if len(ip) > 0x600:
         raise ValueError("IP exceeds first-sector 0x600-byte space")
+    if len(sp) > 0x7800:
+        raise ValueError("SP exceeds system-sector space")
     image = bytearray(SECTOR * SECTORS)
     put_text(image, 0, 16, "SEGADISCSYSTEM")
     put_text(image, 0x10, 11, "POWERDRIFT0")
@@ -62,6 +65,7 @@ def build(ip):
     image[0x190:0x193] = b"J  "
     put_text(image, 0x1f0, 16, "E")
     image[0x200:0x200 + len(ip)] = ip
+    image[0x800:0x800 + len(sp)] = sp
 
     pvd = memoryview(image)[16 * SECTOR:17 * SECTOR]
     pvd[0:7] = b"\x01CD001\x01"
@@ -93,10 +97,11 @@ def build(ip):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("ip", type=pathlib.Path)
+    parser.add_argument("sp", type=pathlib.Path)
     parser.add_argument("iso", type=pathlib.Path)
     parser.add_argument("cue", type=pathlib.Path)
     args = parser.parse_args()
-    args.iso.write_bytes(build(args.ip.read_bytes()))
+    args.iso.write_bytes(build(args.ip.read_bytes(), args.sp.read_bytes()))
     args.cue.write_text(f'FILE "{args.iso.name}" BINARY\n  TRACK 01 MODE1/2048\n    INDEX 01 00:00:00\n', encoding="ascii")
 
 
