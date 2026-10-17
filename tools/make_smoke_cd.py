@@ -43,7 +43,9 @@ def put_text(data, start, size, value):
     data[start:start + size] = encoded.ljust(size, b" ")
 
 
-def build(ip, sp):
+def build(ip, sp, region="E"):
+    if region not in ("E", "J", "U"):
+        raise ValueError("region must be E, J, or U")
     if len(ip) > 0x600:
         raise ValueError("IP exceeds first-sector 0x600-byte space")
     if len(sp) > 0x7800:
@@ -63,7 +65,7 @@ def build(ip, sp):
     put_text(image, 0x150, 48, "PHASE ZERO SMOKE")
     put_text(image, 0x180, 14, "GM PD00001 -00")
     image[0x190:0x193] = b"J  "
-    put_text(image, 0x1f0, 16, "E")
+    put_text(image, 0x1f0, 16, region)
     image[0x200:0x200 + len(ip)] = ip
     image[0x800:0x800 + len(sp)] = sp
 
@@ -100,8 +102,9 @@ def main():
     parser.add_argument("sp", type=pathlib.Path)
     parser.add_argument("iso", type=pathlib.Path)
     parser.add_argument("cue", type=pathlib.Path)
+    parser.add_argument("--region", choices=("E", "J", "U"), default="E")
     args = parser.parse_args()
-    args.iso.write_bytes(build(args.ip.read_bytes(), args.sp.read_bytes()))
+    args.iso.write_bytes(build(args.ip.read_bytes(), args.sp.read_bytes(), args.region))
     args.cue.write_text(f'FILE "{args.iso.name}" BINARY\n  TRACK 01 MODE1/2048\n    INDEX 01 00:00:00\n', encoding="ascii")
 
 
