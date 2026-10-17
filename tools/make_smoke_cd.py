@@ -2,8 +2,9 @@
 """Build a deterministic, original-code Sega CD Phase 0 boot *candidate*.
 
 This emits a 2048-byte-sector ISO and CUE containing original IP and SP code.
-It does not supply Sega's region-dependent security program. Actual boot
-requires emulator execution.
+An optional, externally supplied startup prefix can be used for private local
+experiments. No prefix data is distributed here. Actual boot requires emulator
+execution.
 """
 
 import argparse
@@ -43,21 +44,33 @@ def put_text(data, start, size, value):
     data[start:start + size] = encoded.ljust(size, b" ")
 
 
-def build(ip, sp, region="E"):
+def build(ip, sp, region="E", startup_prefix=None):
     if region not in ("E", "J", "U"):
         raise ValueError("region must be E, J, or U")
-    if len(ip) > 0x600:
-        raise ValueError("IP exceeds first-sector 0x600-byte space")
-    if len(sp) > 0x7800:
-        raise ValueError("SP exceeds system-sector space")
+    if startup_prefix is None:
+        if len(ip) > 0x600:
+            raise ValueError("IP exceeds first-sector 0x600-byte space")
+        if len(sp) > 0x7800:
+            raise ValueError("SP exceeds system-sector space")
+        ip_address, ip_size = 0x200, 0x600
+        sp_address, sp_size = 0x800, 0x7800
+        payload = ip
+    else:
+        payload = startup_prefix + ip
+        if len(payload) > 0xE00:
+            raise ValueError("startup prefix and IP exceed expanded IP space")
+        if len(sp) > 0x7000:
+            raise ValueError("SP exceeds expanded system-sector space")
+        ip_address, ip_size = 0x800, 0x800
+        sp_address, sp_size = 0x1000, 0x7000
     image = bytearray(SECTOR * SECTORS)
     put_text(image, 0, 16, "SEGADISCSYSTEM")
     put_text(image, 0x10, 11, "POWERDRIFT0")
     image[0x1b:0x1d] = b"\x00\x01"
     image[0x1d] = 1
     put_text(image, 0x20, 12, "PHASE0SMOKE")
-    struct.pack_into(">4I", image, 0x30, 0x200, 0x600, 0, 0)
-    struct.pack_into(">4I", image, 0x40, 0x800, 0x7800, 0, 0)
+    struct.pack_into(">4I", image, 0x30, ip_address, ip_size, 0, 0)
+    struct.pack_into(">4I", image, 0x40, sp_address, sp_size, 0, 0)
     image[0x100:0x200] = b" " * 0x100
     put_text(image, 0x100, 16, "SEGA MEGA DRIVE")
     put_text(image, 0x110, 16, "(C) PDCD 2026")
@@ -66,8 +79,8 @@ def build(ip, sp, region="E"):
     put_text(image, 0x180, 14, "GM PD00001 -00")
     image[0x190:0x193] = b"J  "
     put_text(image, 0x1f0, 16, region)
-    image[0x200:0x200 + len(ip)] = ip
-    image[0x800:0x800 + len(sp)] = sp
+    image[0x200:0x200 + len(payload)] = payload
+    image[sp_address:sp_address + len(sp)] = sp
 
     pvd = memoryview(image)[16 * SECTOR:17 * SECTOR]
     pvd[0:7] = b"\x01CD001\x01"
@@ -103,8 +116,11 @@ def main():
     parser.add_argument("iso", type=pathlib.Path)
     parser.add_argument("cue", type=pathlib.Path)
     parser.add_argument("--region", choices=("E", "J", "U"), default="E")
+    parser.add_argument("--startup-prefix", type=pathlib.Path,
+                        help="external local startup bytes; never add them or derived ISO to Git")
     args = parser.parse_args()
-    args.iso.write_bytes(build(args.ip.read_bytes(), args.sp.read_bytes(), args.region))
+    prefix = args.startup_prefix.read_bytes() if args.startup_prefix else None
+    args.iso.write_bytes(build(args.ip.read_bytes(), args.sp.read_bytes(), args.region, prefix))
     args.cue.write_text(f'FILE "{args.iso.name}" BINARY\n  TRACK 01 MODE1/2048\n    INDEX 01 00:00:00\n', encoding="ascii")
 
 
