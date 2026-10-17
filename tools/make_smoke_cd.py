@@ -14,6 +14,8 @@ import struct
 SECTOR = 2048
 SECTORS = 300
 ROOT_SECTOR = 20
+SILENT_AUDIO_SECTORS = 150
+AUDIO_SECTOR = 2352
 
 
 def both16(value):
@@ -118,10 +120,19 @@ def main():
     parser.add_argument("--region", choices=("E", "J", "U"), default="E")
     parser.add_argument("--startup-prefix", type=pathlib.Path,
                         help="external local startup bytes; never add them or derived ISO to Git")
+    parser.add_argument("--silent-audio-track", type=pathlib.Path,
+                        help="write a generated two-second silent CD-DA track at this path")
     args = parser.parse_args()
     prefix = args.startup_prefix.read_bytes() if args.startup_prefix else None
     args.iso.write_bytes(build(args.ip.read_bytes(), args.sp.read_bytes(), args.region, prefix))
-    args.cue.write_text(f'FILE "{args.iso.name}" BINARY\n  TRACK 01 MODE1/2048\n    INDEX 01 00:00:00\n', encoding="ascii")
+    cue = f'FILE "{args.iso.name}" BINARY\n  TRACK 01 MODE1/2048\n    INDEX 01 00:00:00\n'
+    if args.silent_audio_track:
+        if args.silent_audio_track.parent.resolve() != args.cue.parent.resolve():
+            parser.error("silent audio track and CUE must share a directory")
+        args.silent_audio_track.write_bytes(bytes(AUDIO_SECTOR * SILENT_AUDIO_SECTORS))
+        cue += (f'FILE "{args.silent_audio_track.name}" BINARY\n'
+                '  TRACK 02 AUDIO\n    INDEX 01 00:00:00\n')
+    args.cue.write_text(cue, encoding="ascii")
 
 
 if __name__ == "__main__":
