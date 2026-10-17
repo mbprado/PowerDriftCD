@@ -4,6 +4,8 @@
 
 **Owner decision (2026-10-18):** use BlastEm alone for future Phase 0 testing, debugging, and logs. Earlier Genesis Plus GX observations remain historical evidence; no further cross-emulator runs are planned. This supersedes the two-emulator task and exit criterion below for ongoing work. A BlastEm pass establishes an emulator-level result only; physical-hardware compatibility remains **unsupported** until separately tested.
 
+**2026-10-18 follow-up — verified by execution:** the [five-second-track EU/US test](2026-10-18-eu-us-five-second-text-boot.md) displayed `HELLO SEGA CD` under EU and U.S. Model 1 and Model 2 BIOSes in BlastEm. The U.S. disc required a longer, locally held U.S. startup sequence; one U.S. Model 1-derived image passed under both U.S. models. Hardware and original-only boot remain **unsupported**.
+
 ## Goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
 

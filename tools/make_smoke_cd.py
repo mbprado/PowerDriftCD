@@ -14,7 +14,7 @@ import struct
 SECTOR = 2048
 SECTORS = 300
 ROOT_SECTOR = 20
-SILENT_AUDIO_SECTORS = 150
+SILENT_AUDIO_SECTORS = 375  # Five seconds at 75 frames/s; above Sega's four-second minimum.
 AUDIO_SECTOR = 2352
 
 
@@ -121,7 +121,7 @@ def main():
     parser.add_argument("--startup-prefix", type=pathlib.Path,
                         help="external local startup bytes; never add them or derived ISO to Git")
     parser.add_argument("--silent-audio-track", type=pathlib.Path,
-                        help="write a generated two-second silent CD-DA track at this path")
+                        help="write a generated five-second silent CD-DA track at this path")
     args = parser.parse_args()
     prefix = args.startup_prefix.read_bytes() if args.startup_prefix else None
     args.iso.write_bytes(build(args.ip.read_bytes(), args.sp.read_bytes(), args.region, prefix))
