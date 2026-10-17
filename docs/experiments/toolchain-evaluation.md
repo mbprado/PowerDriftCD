@@ -1,5 +1,7 @@
 # Phase 0 toolchain evaluation — 2026-10-16
 
+**2026-10-18 update — verified by execution:** a later [private two-track text-disc test](2026-10-18-private-text-disc-boot.md) reached the original IP marker and displayed text in BlastEm under EU Model 1 and Model 2 BIOS files. The owner authorized a local Sonic-derived startup prefix, which remains ignored and outside Git. The original-only image still fails, stock-hardware boot is **unsupported**, and the renderer decision remains NO-GO pending Phase 0 review. The findings below describe the earlier original-only candidate.
+
 **Decision: NO-GO for renderer work.** **Verified by execution:** GNU m68k tools assembled and linked an eight-byte original initial program, and the local image builder emitted a Sega Mega CD image recognized by macOS `file`, p7zip and BlastEm. [The BIOS-backed follow-up](2026-10-16-bios-backed-emulator-check.md) verified EU BIOS UI operation in BlastEm and Genesis Plus GX, but the image did not reach the test marker in the observed runs. **Unsupported:** actual BIOS handoff into the program, stock-hardware boot, and a two-emulator disc-program pass. Those Phase 0 exit criteria remain open.
 
 ## Hypothesis and acceptance
