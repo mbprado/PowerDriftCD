@@ -46,7 +46,7 @@ def put_text(data, start, size, value):
     data[start:start + size] = encoded.ljust(size, b" ")
 
 
-def build(ip, sp, region="E", startup_prefix=None):
+def build(ip, sp, region="U", startup_prefix=None):
     if region not in ("E", "J", "U"):
         raise ValueError("region must be E, J, or U")
     if startup_prefix is None:
@@ -117,7 +117,7 @@ def main():
     parser.add_argument("sp", type=pathlib.Path)
     parser.add_argument("iso", type=pathlib.Path)
     parser.add_argument("cue", type=pathlib.Path)
-    parser.add_argument("--region", choices=("E", "J", "U"), default="E")
+    parser.add_argument("--region", choices=("E", "J", "U"), default="U")
     parser.add_argument("--startup-prefix", type=pathlib.Path,
                         help="external local startup bytes; never add them or derived ISO to Git")
     parser.add_argument("--silent-audio-track", type=pathlib.Path,

@@ -1,5 +1,7 @@
 # Phase 0 emulator comparison — 2026-10-16
 
+**2026-10-18 update — verified by execution:** BlastEm later ran the private original-text IP under EU and U.S. Model 1/2 BIOSes; see the [EU/US boot record](2026-10-18-eu-us-five-second-text-boot.md). The original-only disc remains unbooted. The table below is the initial 2026-10-16 snapshot, and the owner has since selected BlastEm alone for ongoing work. Physical testing is deferred.
+
 Labels describe evidence from this work, not a general compatibility rating. An untested feature is **unsupported** as a present capability claim. No physical-hardware test was performed.
 
 | Candidate | Sega CD boot and firmware | Main/sub 68000 debugger | Word RAM, ASIC, VDP | Automation | Result |

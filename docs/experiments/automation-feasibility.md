@@ -1,5 +1,7 @@
 # Phase 0 automation feasibility — 2026-10-16
 
+**2026-10-18 update — verified by execution:** interactive BlastEm debugger commands advanced a private disc, injected Start, hit the original main-CPU IP breakpoint, and captured screenshots under EU and U.S. Model 1/2 BIOSes; see the [EU/US boot record](2026-10-18-eu-us-five-second-text-boot.md). This is repeatable debugger-driven GUI testing, not validated headless execution or hardware-speed measurement. The findings below are the earlier automation snapshot.
+
 **Verified by execution:** [scripts/capture-emulator.py](../../scripts/capture-emulator.py) runs an emulator under a PTY, bounds host execution time, captures the console transcript in `build/evidence/`, and writes JSON with image/log SHA-256, exit status, timeout and host details. The result intentionally defaults to `INCONCLUSIVE` and `boot_verified: false`; process exit cannot establish Sega CD boot. Cycle and frame counters remain `null`. `wall_seconds` is measured by the host monotonic clock, not by emulated hardware.
 
 **Verified by execution:** the BlastEm 1.0.0 run used:

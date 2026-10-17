@@ -1,7 +1,7 @@
-# Project rules — version 1.0
+# Project rules — version 1.1
 
 ## Mission and constraints
-Build a modern, maximal-fidelity Power Drift conversion for stock Mega Drive/Genesis + Sega CD/Mega CD. No enhancement cartridge or hardware modification. Original arcade visuals, especially steep curves, track banking, elevation and camera movement, are the reference. Initial target is NTSC; investigate PAL later.
+Build a modern, maximal-fidelity Power Drift conversion for stock Mega Drive/Genesis + Sega CD/Mega CD. No enhancement cartridge or hardware modification. Original arcade visuals, especially steep curves, track banking, elevation and camera movement, are the reference. The development baseline is the U.S. Genesis/Sega CD (NTSC-U), matching the owner's console for a future physical test. Run U.S. BIOS/region configurations first; use the European BIOS as a regression check where useful. Investigate PAL later. Physical-hardware boot and performance tests are deferred by owner decision; emulator results do not establish hardware compatibility.
 
 ## Fidelity and tradeoffs
 Arcade-faithful handling, track layout, opponent behavior and camera dynamics take precedence over mimicking a hypothetical 1992 conversion. Targets of 30 fps baseline, 60 fps stretch and 320×224 output are **unvalidated goals**, not guarantees. Any compromises must be justified by captured evidence. Smaller viewports and selective detail are legitimate experiments, not assumed solutions.
