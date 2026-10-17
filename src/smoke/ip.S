@@ -1,5 +1,5 @@
 /* Original Sega CD initial program for Phase 0.  The BIOS should enter here
- * on the sub 68000; D0 is a debugger-visible marker. */
+ * on the main 68000; D0 is a debugger-visible marker. */
     .section .text
     .global _start
 _start:
