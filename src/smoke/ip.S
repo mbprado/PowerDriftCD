@@ -51,6 +51,14 @@ wait_reply:
     bne.s   wait_reply
     move.l  #0x4d533030, %d3    /* "MS00": both CPUs exchanged a word */
 .endif
+.ifdef LEVEL2_TEST
+    move.w  #0x5044, 0xa1201e    /* request marker: "PD" */
+    move.b  #0x81, 0xa12000     /* request sub-CPU level-2 interrupt */
+wait_level2:
+    cmpi.w  #0x4932, 0xa1202e   /* interrupt callback reply: "I2" */
+    bne.s   wait_level2
+    move.l  #0x49323030, %d3    /* "I200": interrupt callback completed */
+.endif
 idle:
     bra.s   idle
 

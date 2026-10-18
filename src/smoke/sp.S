@@ -32,6 +32,13 @@ main_loop:
 .endif
     rts
 interrupt:
+.ifdef LEVEL2_TEST
+    cmpi.w  #0x5044, 0xff801e   /* only acknowledge this experiment's command */
+    bne.s   1f
+    move.l  #0x49323030, %d2    /* "I200" debugger marker */
+    move.w  #0x4932, 0xff802e   /* reply only from the level-2 callback */
+1:
+.endif
     rts
 user_call:
     rts

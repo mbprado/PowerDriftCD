@@ -10,6 +10,8 @@
 
 **2026-10-18 sub-CPU follow-up — verified by execution:** the [U.S. handshake experiment](2026-10-18-us-subcpu-handshake.md) reached the original `MAIN` system-program callback and exchanged one command/reply word between the CPUs in BlastEm under both U.S. BIOS models. Requesting the sub-CPU level-2 interrupt after writing the command was necessary in this test. No physical-hardware or timing claim follows from this result.
 
+**2026-10-18 level-2 follow-up — verified by execution:** the [dedicated callback experiment](2026-10-18-us-level2-callback.md) stopped in the sub-CPU level-2 callback and received its distinct `I2` reply under both U.S. BIOS models in BlastEm. Interrupt timing and hardware behavior remain **unsupported**.
+
 ## Goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
 
