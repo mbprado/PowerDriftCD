@@ -24,5 +24,8 @@ Main-CPU cycles, sub-CPU cycles, ASIC busy/latency, Word RAM ownership swaps, tr
 ## Determinism
 Use fixed camera paths, fixed car/traffic seeds, a fixed frame limit (e.g., 600 frames) and known output checksum(s). Keep emulator-host speed separate from emulated cycle timing. Screenshot comparisons are supplementary, not precise timing evidence.
 
+## Sega CD BIOS coverage
+For routine development, use the U.S. Model 2 BIOS in BlastEm. Run U.S. Model 1 at the compatibility checkpoints defined in [the BIOS test policy](experiments/2026-10-18-us-bios-test-policy.md). Record the exact BIOS file checksum and any local startup-prefix checksum in each result. Compare behavior on the same disc image when possible; if a BIOS fails, investigate both before claiming a model-specific difference. Physical-console testing remains deferred until the owner explicitly requests it.
+
 ## Result language
 Use: `PASS`, `FAIL`, `INCONCLUSIVE`, or `NOT RUN`. If a tool or feature is documented but not executed, mark it **documented only**.
