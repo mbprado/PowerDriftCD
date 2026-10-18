@@ -1,5 +1,7 @@
 # Phase 0 toolchain evaluation — 2026-10-16
 
+**2026-10-18 review update:** the owner accepted the [limited Phase 0 review](2026-10-18-phase-0-review.md) for Phase 1 synthetic emulator characterization. The historical NO-GO below applied before a private-disc boot was verified; it remains correct for an original-only distributable disc and for physical-hardware claims. No production renderer has started.
+
 **2026-10-18 update — verified by execution:** a later [private two-track text-disc test](2026-10-18-private-text-disc-boot.md) reached the original IP marker and displayed text in BlastEm under EU Model 1 and Model 2 BIOS files. The owner authorized a local Sonic-derived startup prefix, which remains ignored and outside Git. The original-only image still fails, stock-hardware boot is **unsupported**, and the renderer decision remains NO-GO pending Phase 0 review. The findings below describe the earlier original-only candidate.
 
 **Later 2026-10-18 update — verified by execution:** the [five-second-track test](2026-10-18-eu-us-five-second-text-boot.md) also displayed the text under U.S. Model 1 and Model 2 BIOSes in BlastEm. U.S. NTSC is now the [development baseline](2026-10-18-us-development-baseline.md); physical testing is deferred by owner decision.
