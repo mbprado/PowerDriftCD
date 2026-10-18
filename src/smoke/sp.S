@@ -57,6 +57,46 @@ switch_wordram_mode:
     move.w  #0x4d52, 0xff802e   /* "MR": mode established */
 wordram_done:
 .endif
+.ifdef WORDRAM_REPEAT_TEST
+    movem.l %d0/%d7, -(%sp)
+    move.w  0xff801e, %d7
+    cmpi.w  #0x574d, %d7       /* "WM": establish 2M mode */
+    beq.s   repeat_switch_mode
+    move.w  %d7, %d0
+    andi.w  #0xff00, %d0
+    cmpi.w  #0x6000, %d0       /* one of sixteen numbered commands */
+    bne.s   repeat_sub_done
+repeat_wait_access:
+    btst    #0, 0xff8003      /* RET=0: sub owns 2M Word RAM */
+    bne.s   repeat_wait_access
+    cmp.w   0x090000, %d7
+    bne.s   repeat_bad_seed
+    move.w  %d7, %d0
+    not.w   %d0
+    cmp.w   0x090002, %d0
+    bne.s   repeat_bad_seed
+    move.w  %d0, 0x090000
+    move.w  %d7, %d0
+    eori.w  #0x5a5a, %d0
+    move.w  %d0, 0x090002
+    move.b  #0x01, 0xff8003   /* return RAM before acknowledging */
+    move.w  %d7, %d0
+    eori.w  #0xc000, %d0
+    move.w  %d0, 0xff802e
+    bra.s   repeat_sub_done
+repeat_bad_seed:
+    move.b  #0x01, 0xff8003
+    move.w  %d7, %d0
+    andi.w  #0x00ff, %d0
+    ori.w   #0xe000, %d0
+    move.w  %d0, 0xff802e     /* error identifies failed command */
+    bra.s   repeat_sub_done
+repeat_switch_mode:
+    move.b  #0x01, 0xff8003
+    move.w  #0x4d52, 0xff802e
+repeat_sub_done:
+    movem.l (%sp)+, %d0/%d7
+.endif
     rts
 user_call:
     rts

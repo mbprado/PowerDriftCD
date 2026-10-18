@@ -14,6 +14,8 @@
 
 **2026-10-18 Word RAM follow-up — verified by execution:** the [2M round-trip experiment](2026-10-18-us-wordram-2m-roundtrip.md) switched from the BIOS's observed 1M mode, yielded Word RAM to the sub-CPU, and read back its two written words after RET under both U.S. BIOS models in BlastEm. The Model 2 debugger trace captured `$2A02` during sub ownership and `$2A01` after return. Timing and hardware compatibility remain **unsupported**.
 
+**2026-10-18 repeatability follow-up — verified by execution:** the [sixteen-handoff test](2026-10-18-us-wordram-repeat.md) completed numbered, bidirectional data checks across sixteen consecutive 2M ownership switches under both U.S. BIOS models in BlastEm. Latency and stock-hardware repeatability remain **unsupported**.
+
 ## Goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
 

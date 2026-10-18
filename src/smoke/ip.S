@@ -95,6 +95,67 @@ wait_main_ownership:
 wordram_fail:
     move.l  #0x57524552, %d3    /* "WRER": data mismatch */
 .endif
+.ifdef WORDRAM_REPEAT_TEST
+    move.w  #0x574d, 0xa1201e    /* "WM": establish 2M mode */
+    move.b  #0x81, 0xa12000
+repeat_wait_mode:
+    cmpi.w  #0x4d52, 0xa1202e   /* "MR": mode ready */
+    bne.s   repeat_wait_mode
+repeat_wait_main:
+    move.b  0xa12003, %d0
+    andi.b  #0x05, %d0          /* MODE=0, RET=1 */
+    cmpi.b  #0x01, %d0
+    bne.s   repeat_wait_main
+    move.w  #0, 0xa1201e
+    moveq   #1, %d6            /* fixed commands $6001..$6010 */
+    moveq   #0, %d5            /* completed handoffs */
+repeat_handoff:
+    move.w  %d6, %d7
+    ori.w   #0x6000, %d7
+    move.w  %d7, 0x210000
+    move.w  %d7, %d0
+    not.w   %d0
+    move.w  %d0, 0x210002
+    move.w  %d7, 0xa1201e
+    move.b  #0x02, 0xa12003     /* main yields 2M Word RAM */
+repeat_wait_sub:
+    btst    #0, 0xa12003
+    bne.s   repeat_wait_sub
+    move.b  #0x81, 0xa12000     /* one level-2 request per handoff */
+    move.w  %d7, %d4
+    eori.w  #0xc000, %d4        /* expected status: $A001..$A010 */
+repeat_wait_reply:
+    move.w  0xa1202e, %d0
+    cmp.w   %d4, %d0
+    beq.s   repeat_return
+    andi.w  #0xf000, %d0
+    cmpi.w  #0xe000, %d0        /* sub-CPU rejected main's seed */
+    beq.s   repeat_fail
+    bra.s   repeat_wait_reply
+repeat_return:
+    move.w  #0, 0xa1201e      /* prevent a later interrupt replay */
+repeat_wait_return:
+    btst    #0, 0xa12003
+    beq.s   repeat_wait_return
+    move.w  0x210000, %d0
+    move.w  0x210002, %d1
+    move.w  %d7, %d4
+    not.w   %d4
+    cmp.w   %d4, %d0
+    bne.s   repeat_fail
+    move.w  %d7, %d4
+    eori.w  #0x5a5a, %d4
+    cmp.w   %d4, %d1
+    bne.s   repeat_fail
+    move.w  %d6, %d5
+    addq.w  #1, %d6
+    cmpi.w  #17, %d6
+    bne     repeat_handoff
+    move.l  #0x52313630, %d3    /* "R160": sixteen verified handoffs */
+    bra     idle
+repeat_fail:
+    move.l  #0x52455252, %d3    /* "RERR": command/data mismatch */
+.endif
 idle:
     bra.s   idle
 
