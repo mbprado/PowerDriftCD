@@ -24,6 +24,12 @@ initialize:
     move.l #0x53503030,%d1  /* "SP00" debugger marker */
     rts
 main_loop:
+.ifdef HANDSHAKE
+    cmpi.w  #0x5044, 0xff801e   /* main-to-sub command word: "PD" */
+    bne.s   1f
+    move.w  #0x5350, 0xff802e   /* sub-to-main reply word: "SP" */
+1:
+.endif
     rts
 interrupt:
     rts

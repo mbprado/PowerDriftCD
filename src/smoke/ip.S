@@ -43,6 +43,14 @@ copy_message:
     dbf     %d2, copy_message
 
     move.w  #0x8144, (%a0)        /* display on */
+.ifdef HANDSHAKE
+    move.w  #0x5044, 0xa1201e    /* last main-to-sub command word: "PD" */
+    move.b  #0x81, 0xa12000     /* enable and request sub-CPU level-2 interrupt */
+wait_reply:
+    cmpi.w  #0x5350, 0xa1202e   /* last sub-to-main status word: "SP" */
+    bne.s   wait_reply
+    move.l  #0x4d533030, %d3    /* "MS00": both CPUs exchanged a word */
+.endif
 idle:
     bra.s   idle
 

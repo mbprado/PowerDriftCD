@@ -8,6 +8,8 @@
 
 **Owner decision (2026-10-18):** future development targets the owner's U.S. Genesis/Sega CD (NTSC-U). Use U.S. region images and BIOSes as the primary BlastEm test configuration; EU checks are regressions. Physical-hardware boot and performance testing are deferred until the owner chooses to do them. **Verified by execution:** the private U.S. text image passed in BlastEm, and the [routine smoke build now defaults to U.S.](2026-10-18-us-development-baseline.md). The original-only U.S. build is still a boot candidate, not a verified bootable disc. Do not infer hardware compatibility from emulator output.
 
+**2026-10-18 sub-CPU follow-up — verified by execution:** the [U.S. handshake experiment](2026-10-18-us-subcpu-handshake.md) reached the original `MAIN` system-program callback and exchanged one command/reply word between the CPUs in BlastEm under both U.S. BIOS models. Requesting the sub-CPU level-2 interrupt after writing the command was necessary in this test. No physical-hardware or timing claim follows from this result.
+
 ## Goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
 
