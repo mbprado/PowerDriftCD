@@ -63,7 +63,11 @@ wordram_done:
     cmpi.w  #0x574d, %d7       /* "WM": establish 2M mode */
     beq.s   repeat_switch_mode
     move.w  %d7, %d0
-    andi.w  #0xff00, %d0
+    .ifdef WORDRAM_LONG_TIMER_TEST
+    andi.w  #0xf000, %d0       /* numbered commands $6001..$6800 */
+    .else
+    andi.w  #0xff00, %d0       /* original sixteen numbered commands */
+    .endif
     cmpi.w  #0x6000, %d0       /* one of sixteen numbered commands */
     bne.s   repeat_sub_done
 repeat_wait_access:
