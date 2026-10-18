@@ -16,6 +16,8 @@
 
 **2026-10-18 repeatability follow-up — verified by execution:** the [sixteen-handoff test](2026-10-18-us-wordram-repeat.md) completed numbered, bidirectional data checks across sixteen consecutive 2M ownership switches under both U.S. BIOS models in BlastEm. Latency and stock-hardware repeatability remain **unsupported**.
 
+**2026-10-18 timer follow-up — verified by execution:** the [stopwatch feasibility experiment](2026-10-18-us-wordram-stopwatch.md) recorded sixteen per-transaction tick values and a whole-batch modulo stopwatch delta for the same handoffs. Two boots per U.S. BIOS reproduced 51 ticks for Model 1 and 52 for Model 2 at 30.72 µs nominal resolution. These are BlastEm timer observations, not hardware-speed measurements. Physical-hardware work remains deferred until the owner explicitly requests it.
+
 ## Goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
 

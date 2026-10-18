@@ -109,7 +109,16 @@ repeat_wait_main:
     move.w  #0, 0xa1201e
     moveq   #1, %d6            /* fixed commands $6001..$6010 */
     moveq   #0, %d5            /* completed handoffs */
+.ifdef WORDRAM_TIMER_TEST
+    lea     timing_samples(%pc), %a3
+    moveq   #0, %d3            /* accumulated stopwatch ticks */
+    lea     timing_batch_start(%pc), %a4
+    move.w  0xa1200c, (%a4)     /* batch start; main side can read, not reset */
+.endif
 repeat_handoff:
+.ifdef WORDRAM_TIMER_TEST
+    move.w  0xa1200c, %d2       /* shared stopwatch, before this transaction */
+.endif
     move.w  %d6, %d7
     ori.w   #0x6000, %d7
     move.w  %d7, 0x210000
@@ -147,10 +156,27 @@ repeat_wait_return:
     eori.w  #0x5a5a, %d4
     cmp.w   %d4, %d1
     bne.s   repeat_fail
+.ifdef WORDRAM_TIMER_TEST
+    move.w  0xa1200c, %d4
+    sub.w   %d2, %d4
+    andi.l  #0x0fff, %d4        /* one 12-bit modulo stopwatch interval */
+    move.w  %d4, (%a3)+
+    add.l   %d4, %d3
+.endif
     move.w  %d6, %d5
     addq.w  #1, %d6
     cmpi.w  #17, %d6
     bne     repeat_handoff
+.ifdef WORDRAM_TIMER_TEST
+    lea     timing_total(%pc), %a4
+    move.l  %d3, (%a4)
+    move.w  0xa1200c, %d4
+    lea     timing_batch_start(%pc), %a4
+    sub.w   (%a4), %d4
+    andi.w  #0x0fff, %d4
+    lea     timing_batch_delta(%pc), %a4
+    move.w  %d4, (%a4)
+.endif
     move.l  #0x52313630, %d3    /* "R160": sixteen verified handoffs */
     bra     idle
 repeat_fail:
@@ -164,3 +190,14 @@ message:
     .word 1,2,3,3,4,0,5,2,6,7,0,8,9
 font:
     .incbin "build/smoke/font.bin"
+.ifdef WORDRAM_TIMER_TEST
+.align 2
+timing_samples:
+    .space 32                   /* sixteen stopwatch tick intervals */
+timing_total:
+    .long 0                    /* sum of the sixteen recorded intervals */
+timing_batch_start:
+    .word 0
+timing_batch_delta:
+    .word 0                    /* one modulo interval around the entire batch */
+.endif
