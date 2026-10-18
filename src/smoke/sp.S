@@ -39,6 +39,24 @@ interrupt:
     move.w  #0x4932, 0xff802e   /* reply only from the level-2 callback */
 1:
 .endif
+.ifdef WORDRAM_TEST
+    cmpi.w  #0x574d, 0xff801e   /* "WM": establish 2M mode */
+    beq.s   switch_wordram_mode
+    cmpi.w  #0x5752, 0xff801e   /* "WR": write the shared data */
+    bne.s   wordram_done
+wait_wordram_access:
+    btst    #0, 0xff8003        /* RET clear: sub-CPU owns 2M Word RAM */
+    bne.s   wait_wordram_access
+    move.w  #0xabcd, 0x090000   /* same offset as main $210000 */
+    move.w  #0x1234, 0x090002
+    move.b  #0x01, 0xff8003     /* RET: return Word RAM to main-CPU */
+    move.w  #0x5744, 0xff802e   /* "WD": done */
+    bra.s   wordram_done
+switch_wordram_mode:
+    move.b  #0x01, 0xff8003     /* 2M mode, RET: main-CPU owns it */
+    move.w  #0x4d52, 0xff802e   /* "MR": mode established */
+wordram_done:
+.endif
     rts
 user_call:
     rts

@@ -59,6 +59,42 @@ wait_level2:
     bne.s   wait_level2
     move.l  #0x49323030, %d3    /* "I200": interrupt callback completed */
 .endif
+.ifdef WORDRAM_TEST
+    move.w  #0x574d, 0xa1201e    /* "WM": ask sub-CPU for 2M mode, main owns */
+    move.b  #0x81, 0xa12000
+wait_wordram_mode:
+    cmpi.w  #0x4d52, 0xa1202e   /* "MR": mode request handled */
+    bne.s   wait_wordram_mode
+wait_2m_main:
+    btst    #2, 0xa12003        /* MODE must be clear */
+    bne.s   wait_2m_main
+    btst    #0, 0xa12003        /* RET must be set */
+    beq.s   wait_2m_main
+    move.w  #0x1357, 0x210000    /* seed the main-visible 2M Word RAM */
+    move.w  #0x2468, 0x210002
+    move.w  #0x5752, 0xa1201e    /* "WR": Word RAM request */
+    move.b  #0x02, 0xa12003     /* DMNA: hand 2M Word RAM to sub-CPU */
+wait_sub_ownership:
+    btst    #0, 0xa12003        /* RET clears when sub-CPU owns Word RAM */
+    bne.s   wait_sub_ownership
+    move.b  #0x81, 0xa12000     /* invoke sub-CPU level-2 callback */
+wait_wordram_reply:
+    cmpi.w  #0x5744, 0xa1202e   /* "WD": sub-CPU finished its write */
+    bne.s   wait_wordram_reply
+wait_main_ownership:
+    btst    #0, 0xa12003        /* RET set after sub-CPU returns Word RAM */
+    beq.s   wait_main_ownership
+    move.w  0x210000, %d4
+    move.w  0x210002, %d5
+    cmpi.w  #0xabcd, %d4
+    bne.s   wordram_fail
+    cmpi.w  #0x1234, %d5
+    bne.s   wordram_fail
+    move.l  #0x57523030, %d3    /* "WR00": verified round trip */
+    bra.s   idle
+wordram_fail:
+    move.l  #0x57524552, %d3    /* "WRER": data mismatch */
+.endif
 idle:
     bra.s   idle
 

@@ -12,6 +12,8 @@
 
 **2026-10-18 level-2 follow-up — verified by execution:** the [dedicated callback experiment](2026-10-18-us-level2-callback.md) stopped in the sub-CPU level-2 callback and received its distinct `I2` reply under both U.S. BIOS models in BlastEm. Interrupt timing and hardware behavior remain **unsupported**.
 
+**2026-10-18 Word RAM follow-up — verified by execution:** the [2M round-trip experiment](2026-10-18-us-wordram-2m-roundtrip.md) switched from the BIOS's observed 1M mode, yielded Word RAM to the sub-CPU, and read back its two written words after RET under both U.S. BIOS models in BlastEm. The Model 2 debugger trace captured `$2A02` during sub ownership and `$2A01` after return. Timing and hardware compatibility remain **unsupported**.
+
 ## Goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
 
