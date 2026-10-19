@@ -1,6 +1,18 @@
 # Phase 0 — Toolchain, emulators and automated data collection
 
-**Status: reviewed for limited Phase 1 emulator characterization (2026-10-18).** The [Phase 0 review](2026-10-18-phase-0-review.md) accepts the private-disc boot limitation for synthetic experiments, while keeping original-only boot, headless automation, independent-emulator coverage, and physical-hardware compatibility open. See [the initial smoke test](2026-10-16-phase-0-smoke.md), [BIOS-backed follow-up](2026-10-16-bios-backed-emulator-check.md), [second EU BIOS check](2026-10-16-eu-model2-bios-check.md), [reference boot control](2026-10-17-reference-boot-control.md), [simple-text boot check](2026-10-18-simple-text-boot.md), [Model 2 text-disc check](2026-10-18-model2-text-boot.md), [shared boot-prefix comparison](2026-10-18-shared-boot-prefix.md), [private text-disc boot](2026-10-18-private-text-disc-boot.md), [toolchain evaluation](toolchain-evaluation.md), [emulator comparison](emulator-comparison.md), and [automation feasibility](automation-feasibility.md). **Verified by execution:** BlastEm reached the original `HELLO SEGA CD` IP and displayed its text from a private two-track disc under both owner-supplied EU Model 1 and Model 2 BIOS files. The private disc used an owner-authorized, ignored local Sonic-derived startup prefix and a generated silent audio track; neither proprietary bytes nor the derived disc are tracked. The original-only distributable ISO still falls through to CD PLAYER. **Unsupported:** original-only smoke-disc boot, stock-hardware boot, and hardware-speed claims. No production road renderer has begun.
+**Current status (2026-10-19): conditionally reviewed, with limited Phase 1 emulator characterization underway.** The owner accepted the [Phase 0 review](2026-10-18-phase-0-review.md) and the private-disc boot limitation for synthetic BlastEm experiments. This is not full closure of the original-only boot, Linux/headless automation, or physical-hardware questions. **Verified by execution:** the private two-track disc ran the original text IP under EU and U.S. Model 1 and Model 2 BIOS files in BlastEm; main/sub-CPU and Word RAM experiments followed. The [long-batch](2026-10-18-us-wordram-long-batch.md) and [paired-path](2026-10-19-us-wordram-paired-phases.md) records are Phase 1 emulator observations, not hardware-speed measurements. The original-only image still falls through to CD PLAYER; no production road renderer has begun.
+
+| Review item | Current disposition |
+| --- | --- |
+| macOS build, private Sega CD boot, main/sub-CPU debugger, 2M Word RAM exchange | `PASS` — **verified by execution** in the linked experiment records and [Phase 0 review](2026-10-18-phase-0-review.md). |
+| Original-only distributable disc boot | `FAIL` in the observed BlastEm runs; a working original-only boot remains **unsupported**. Private startup bytes and derived images stay ignored. |
+| Linux execution, headless graphics, unattended input replay | `NOT RUN`; availability for this project remains **unsupported**. |
+| Independent-emulator IP execution | `NOT RUN`; the owner chose BlastEm alone, superseding this original Phase 0 requirement. No cross-emulator compatibility claim is made. |
+| ASIC busy/latency and VDP transfer timing | **Unsupported**; these are Phase 1 characterization questions, not evidence for a renderer architecture yet. |
+| Physical-hardware boot or performance | `NOT RUN`; expressly deferred until the owner requests it. |
+
+Earlier evidence remains in the [initial smoke test](2026-10-16-phase-0-smoke.md), [BIOS-backed follow-up](2026-10-16-bios-backed-emulator-check.md), [second EU BIOS check](2026-10-16-eu-model2-bios-check.md), [reference boot control](2026-10-17-reference-boot-control.md), [simple-text boot check](2026-10-18-simple-text-boot.md), [Model 2 text-disc check](2026-10-18-model2-text-boot.md), [shared boot-prefix comparison](2026-10-18-shared-boot-prefix.md), [private text-disc boot](2026-10-18-private-text-disc-boot.md), [toolchain evaluation](toolchain-evaluation.md), [emulator comparison](emulator-comparison.md), and [automation feasibility](automation-feasibility.md).
+Those dated records describe the status at the time of each experiment; the disposition above is current.
 
 **Owner decision (2026-10-18):** use BlastEm alone for future Phase 0 testing, debugging, and logs. Earlier Genesis Plus GX observations remain historical evidence; no further cross-emulator runs are planned. This supersedes the two-emulator task and exit criterion below for ongoing work. A BlastEm pass establishes an emulator-level result only; physical-hardware compatibility remains **unsupported** until separately tested.
 
@@ -20,7 +32,7 @@
 
 **Owner decision (2026-10-18):** the [U.S. BIOS test policy](2026-10-18-us-bios-test-policy.md) makes Model 2 the routine BlastEm BIOS and reserves Model 1 for compatibility checkpoints. Both BIOSes passed the functional tests above; the one-tick stopwatch difference does not justify duplicating every development run. No physical-hardware testing is authorized.
 
-## Goals
+## Original Phase 0 plan and goals
 Establish a reproducible Sega CD native boot/demo pipeline and assess whether Codex can run tests and collect meaningful data without Windows.
 
 ## Emulator candidates (verify rather than assume)
@@ -32,7 +44,7 @@ Establish a reproducible Sega CD native boot/demo pipeline and assess whether Co
 
 For each, record binary version, source commit, host system, image format, firmware requirement, debug interface, both-CPU register visibility, Word RAM/ASIC/VDP trace support, scripting/headless options, deterministic frames, and known inaccuracies.
 
-## Tasks
+## Original tasks (review disposition above)
 1. Identify and pin a working cross-compiler/assembler/linker and CD image builder for macOS and Linux.
 2. Assemble/build a minimal **original-code, original-assets** Sega CD demo; do not commit BIOS data.
 3. Boot it in BlastEm with correctly sourced local BIOS firmware; record the owner-approved single-emulator limitation.
@@ -42,7 +54,7 @@ For each, record binary version, source commit, host system, image format, firmw
 7. Produce a comparison with evidence labels: verified / documented / hypothesis / unsupported.
 8. Record BlastEm as the primary debugger and the next measurable graphics experiment once the boot gate is reviewed.
 
-## Exit criteria
+## Original exit criteria (review disposition above)
 - Minimal CD image built from documented source
 - Booted under BlastEm OR precise blockers recorded, with no cross-emulator compatibility claim
 - Reproduction instructions for macOS and Linux
