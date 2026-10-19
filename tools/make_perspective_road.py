@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate original road stamps, 24 ASIC trace tables, and 60 frame checksums."""
+"""Generate original road stamps, full/compact traces, and frame checksums."""
 
 import math
 from pathlib import Path
@@ -44,6 +44,29 @@ def lines(frame):
         yield (x_start, y_start, dx_eighth * 256, bank * 256)
 
 
+def compact_state(frame):
+    """Store camera constants and two signed curve/ridge samples per scanline."""
+    phase = 2 * math.pi * (frame % PERIOD) / PERIOD
+    bank = round(2 * math.sin(phase))
+    horizon = 4 + round(3 * math.sin(phase + math.pi / 3))
+    samples = [(round(5 * math.sin(phase + y * math.pi / 48)),
+                round(6 * math.sin(phase + y * math.pi / 32)))
+               for y in range(SIZE)]
+    return bank, horizon, samples
+
+
+def expand_compact_state(frame, state):
+    """Integer reference for the sub-CPU trace builder."""
+    bank, horizon, samples = state
+    for y, (curve, ridge) in enumerate(samples):
+        depth = max(0, y - horizon)
+        dx_eighth = (16, 12, 8, 4)[min(3, depth // 15)]
+        bank_shift = bank * (y - SIZE // 2) // 8
+        source_y = 20 + 3 * depth - depth * depth // 48 + ridge + 2 * frame
+        yield ((136 + curve + bank_shift) * 8 - 32 * dx_eighth,
+               source_y * 8 - 32 * bank, dx_eighth * 256, bank * 256)
+
+
 def source_pixel(sx, sy):
     if not (0 <= sx < 256 and 0 <= sy < 256):
         raise ValueError(f"source coordinate outside stamp map: {sx}, {sy}")
@@ -81,11 +104,20 @@ def main():
     stamps.extend(tile_bytes(grass_pixel))
     (destination / "road-stamps.bin").write_bytes(stamps)
     trace = bytearray()
+    compact = bytearray()
     for frame in range(PERIOD):
+        state = compact_state(frame)
+        if list(expand_compact_state(frame, state)) != list(lines(frame)):
+            raise ValueError(f"compact trace mismatch at state {frame}")
+        bank, horizon, samples = state
+        compact.extend((bank & 0xFF, horizon, 2 * frame, 0))
+        for curve, ridge in samples:
+            compact.extend((curve & 0xFF, ridge & 0xFF))
         for line in lines(frame):
             for word in line:
                 trace.extend((word & 0xFFFF).to_bytes(2, "big"))
     (destination / "road-traces.bin").write_bytes(trace)
+    (destination / "road-compact.bin").write_bytes(compact)
     checksums = []
     for frame in range(FRAMES):
         words = output_words(frame)

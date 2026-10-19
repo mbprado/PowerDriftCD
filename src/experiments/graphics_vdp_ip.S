@@ -8,6 +8,8 @@
 .equ ERROR,0xff3f00
 .equ STAGING,0xff6000
 .equ PRESTAGE_TICKS,0xff2ff0
+.equ READY_TICKS,0xff2ff2
+.equ VERIFY_STAGE_START,0xff2ff4
 .ifdef SIZE_64
 .equ TILE_DIM,8
 .equ COPY_WORDS,1024
@@ -87,10 +89,15 @@ wait_main:
 .endif
     bsr request_asic
 .ifdef PRESTAGE_DMA
+.ifndef ROAD_RUNTIME_COMBINED
     bsr prestage_next
+.endif
 .endif
     lea RESULTS,%a6
     moveq #0,%d5 /* previous frame-start stopwatch */
+.ifdef ROAD_RUNTIME
+    clr.w READY_TICKS
+.endif
 frame_loop:
 .ifdef FRAME_DIV_2
     /* Skip one complete VBlank so uploads target 30 Hz. */
@@ -199,6 +206,10 @@ upload_done:
     move.w 0x218000,(%a6)+ /* prior ASIC start-to-busy-clear */
 .endif
     move.w %d4,(%a6)+ /* prior ownership/prepare/ASIC/return */
+.ifdef ROAD_RUNTIME
+    move.w 0x218002,(%a6)+ /* prior sub-CPU trace construction */
+    move.w READY_TICKS,(%a6)+ /* prior work ready after VBlank start */
+.endif
 
     addq.w #1,%d6
     cmpi.w #FRAMES,%d6
@@ -210,7 +221,15 @@ upload_done:
     addq.w #CASE_BASE,%d7
     bsr request_asic
 .ifdef PRESTAGE_DMA
+.ifndef ROAD_RUNTIME_COMBINED
     bsr prestage_next
+.endif
+.endif
+.ifdef ROAD_RUNTIME
+    move.w STOPWATCH,%d0
+    sub.w %d5,%d0
+    andi.w #0x0fff,%d0
+    move.w %d0,READY_TICKS
 .endif
     bra frame_loop
 all_done:
@@ -266,11 +285,24 @@ wait_return:
 .endif
     move.w #COPY_WORDS-1,%d1
     moveq #0,%d2
+.ifdef ROAD_RUNTIME_COMBINED
+    move.w STOPWATCH,VERIFY_STAGE_START
+    lea STAGING,%a3
+.endif
 sum_loop:
     moveq #0,%d0
     move.w (%a2)+,%d0
+.ifdef ROAD_RUNTIME_COMBINED
+    move.w %d0,(%a3)+
+.endif
     add.l %d0,%d2
     dbf %d1,sum_loop
+.ifdef ROAD_RUNTIME_COMBINED
+    move.w STOPWATCH,%d0
+    sub.w VERIFY_STAGE_START,%d0
+    andi.w #0x0fff,%d0
+    move.w %d0,PRESTAGE_TICKS /* checksum and staging together */
+.endif
 .ifdef ROAD_TRACE
     move.w %d6,%d0
 .else
