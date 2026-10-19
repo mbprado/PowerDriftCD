@@ -1,0 +1,742 @@
+{
+  "test_id": "phase1-graphics-vdp-32x32-asic-60-frames",
+  "status": "pass",
+  "evidence_level": "verified by execution",
+  "git_commit": "4c3ace15641d2ed90b5d069d1627bd3374a2996f",
+  "build_id": "8002396c7f2cfed34c655f34ab449136144c3bb4b844ab6618923ac9f9a2170d",
+  "source_tree_dirty_at_execution": true,
+  "host_os": "macOS 26.6.2",
+  "host_arch": "x86_64",
+  "emulator": "BlastEm",
+  "emulator_version": "1.0.0",
+  "emulator_archive_sha256": "2315f5f32b8400b4c56980b87043516ac9ec22aac5fdb9d3bdb97c2b236da221",
+  "bios_label": "owner-supplied U.S. Model 2; identity not independently authenticated",
+  "video_mode": "NTSC U.S.",
+  "scenario_seed": 0,
+  "target_fps": 30,
+  "bios_sha256": "b1c2036b79467514eaaa69c76e5ba83801621e821059caa53cb921a0b21e3af4",
+  "disc_image_sha256": "8002396c7f2cfed34c655f34ab449136144c3bb4b844ab6618923ac9f9a2170d",
+  "raw_log_sha256": "314341c30a5a7c7e6038aa624bc250d5506aa33bd2573c12af4dbcf8f7aacdd1",
+  "measurements": {
+    "main_cpu_cycles": null,
+    "sub_cpu_cycles": null,
+    "asic_cycles": null,
+    "word_ram_swaps": null,
+    "vdp_transfer_bytes": 30720,
+    "deadline_misses": 0
+  },
+  "measurement_provenance": {
+    "timer": "emulated Sega CD 12-bit stopwatch, modulo 4096",
+    "vblank_deadline": "VDP VBlank status bit sampled immediately after upload",
+    "frame_cadence": "timer difference between successive VBlank starts; first sample excluded",
+    "physical_hardware": "not tested"
+  },
+  "physical_hardware_tested": false,
+  "artifact_paths": [
+    "build/evidence-animation-asic-30.log",
+    "docs/experiments/data/graphics-animation-asic-30.json"
+  ],
+  "notes": "ASIC output checksum checked in-program before every upload; no hardware validation.",
+  "output_width": 32,
+  "output_height": 32,
+  "bytes_transferred_per_frame": 512,
+  "frames_requested": 60,
+  "frames_executed": 60,
+  "vblank_interval_ticks_min_median_max": [
+    1086,
+    1086,
+    1087
+  ],
+  "summary": {
+    "cpu_direct_from_word_ram": {
+      "count": 30,
+      "staging_ticks_min_median_max": [
+        0,
+        0.0,
+        0
+      ],
+      "upload_ticks_min_median_max": [
+        24,
+        24.0,
+        25
+      ],
+      "vblank_upload_deadlines_missed": 0
+    },
+    "dma_from_main_ram_staging": {
+      "count": 30,
+      "staging_ticks_min_median_max": [
+        24,
+        24.0,
+        25
+      ],
+      "upload_ticks_min_median_max": [
+        7,
+        7.0,
+        7
+      ],
+      "vblank_upload_deadlines_missed": 0
+    }
+  },
+  "frames": [
+    {
+      "frame": 0,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": null,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 1,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 2,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 71
+    },
+    {
+      "frame": 3,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 4,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 71
+    },
+    {
+      "frame": 5,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 6,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 7,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 8,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 9,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 10,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 11,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 12,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 13,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 71
+    },
+    {
+      "frame": 14,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 15,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 71
+    },
+    {
+      "frame": 16,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 17,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 18,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 19,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 20,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 21,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 22,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 23,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 24,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 25,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 26,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 27,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 28,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 71
+    },
+    {
+      "frame": 29,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 30,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 31,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 32,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 33,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 34,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 35,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 36,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 37,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 38,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 39,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 40,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 41,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 42,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 43,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 44,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 45,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 25,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 71
+    },
+    {
+      "frame": 46,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 47,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 71
+    },
+    {
+      "frame": 48,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 24,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 49,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 50,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 51,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 52,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 53,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 54,
+      "transform": "scale",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 55,
+      "transform": "rotate",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 56,
+      "transform": "combined",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 57,
+      "transform": "scale",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 58,
+      "transform": "rotate",
+      "transfer": "cpu_direct_from_word_ram",
+      "vblank_start_interval_ticks": 1087,
+      "staging_ticks": 0,
+      "vram_upload_ticks": 25,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 25,
+      "ownership_prepare_asic_return_ticks": 72
+    },
+    {
+      "frame": 59,
+      "transform": "combined",
+      "transfer": "dma_from_main_ram_staging",
+      "vblank_start_interval_ticks": 1086,
+      "staging_ticks": 24,
+      "vram_upload_ticks": 7,
+      "vblank_asserted_after_upload": true,
+      "asic_start_to_busy_clear_ticks": 24,
+      "ownership_prepare_asic_return_ticks": 72
+    }
+  ]
+}

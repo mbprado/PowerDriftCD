@@ -2,7 +2,7 @@
 
 **Mission:** develop the most arcade-faithful Power Drift conversion achievable on an **unmodified Sega Mega Drive/Genesis + Sega CD/Mega CD**, using modern engineering, rigorous measurement, and offline precomputation.
 
-**Status:** Limited Phase 1 emulator characterization is underway after the [Phase 0 review](docs/experiments/2026-10-18-phase-0-review.md). U.S. Genesis/Sega CD (NTSC-U) is the development baseline. Original-only boot and hardware compatibility remain open; there is no running port or measured hardware-performance claim.
+**Status:** [Phase 1 graphics characterization](docs/experiments/graphics-characterization.md) has verified original graphics ASIC transforms, Genesis VDP display, and small deterministic 30/60 Hz pipelines in BlastEm after the [Phase 0 review](docs/experiments/2026-10-18-phase-0-review.md). U.S. Genesis/Sega CD (NTSC-U) is the development baseline. Original-only boot and physical-hardware compatibility remain open; there is no running port or measured hardware-performance claim.
 
 ## Principles
 - Original console hardware is the target; no expansion CPU/RAM or emulator-only shortcuts.
