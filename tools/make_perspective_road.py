@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Generate original road stamps, 24 ASIC trace tables, and 60 frame checksums."""
+
+import math
+from pathlib import Path
+import sys
+
+from make_graphics_asic_fixture import tile_bytes
+
+SIZE = 64
+PERIOD = 24
+FRAMES = 60
+
+
+def road_pixel(x, y):
+    if x in (0, 15):
+        return 15  # white edge
+    if x in (1, 14):
+        return 10  # red shoulder
+    if x in (7, 8) and y < 8:
+        return 14  # dashed center line
+    return 7  # asphalt
+
+
+def grass_pixel(x, y):
+    return 2 + ((x // 4 + y // 4) & 1)
+
+
+def lines(frame):
+    phase = 2 * math.pi * (frame % PERIOD) / PERIOD
+    bank = round(2 * math.sin(phase))  # eighth-pixels of Y per destination X
+    horizon = 4 + round(3 * math.sin(phase + math.pi / 3))
+    for y in range(SIZE):
+        depth = max(0, y - horizon)
+        scale_band = min(3, depth // 15)
+        dx_eighth = (16, 12, 8, 4)[scale_band]
+        curve = round(5 * math.sin(phase + y * math.pi / 48))
+        bank_shift = bank * (y - SIZE // 2) // 8
+        # The ridge term makes the road texture compress and expand along depth.
+        ridge = round(6 * math.sin(phase + y * math.pi / 32))
+        source_y = 20 + 3 * depth - depth * depth // 48 + ridge + 2 * (frame % PERIOD)
+        x_start = (136 + curve + bank_shift) * 8 - 32 * dx_eighth
+        y_start = source_y * 8 - 32 * bank
+        yield (x_start, y_start, dx_eighth * 256, bank * 256)
+
+
+def source_pixel(sx, sy):
+    if not (0 <= sx < 256 and 0 <= sy < 256):
+        raise ValueError(f"source coordinate outside stamp map: {sx}, {sy}")
+    pixel = road_pixel if sx // 16 == 8 else grass_pixel
+    return pixel(sx % 16, sy % 16)
+
+
+def output_words(frame):
+    image = []
+    trace_lines = list(lines(frame))
+    for x_cell in range(SIZE // 8):
+        for y_cell in range(SIZE // 8):
+            for local_y in range(8):
+                y = y_cell * 8 + local_y
+                x_start, y_start, dx, dy = trace_lines[y]
+                for pair in range(2):
+                    x = x_cell * 8 + pair * 4
+                    pixels = []
+                    for pixel_x in range(x, x + 4):
+                        sx = (x_start + pixel_x * (dx // 256)) // 8
+                        sy = (y_start + pixel_x * (dy // 256)) // 8
+                        pixels.append(source_pixel(sx, sy))
+                    image.append(sum(value << (12 - 4 * index)
+                                     for index, value in enumerate(pixels)))
+    return image
+
+
+def main():
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: make_perspective_road.py OUTDIR")
+    destination = Path(sys.argv[1])
+    destination.mkdir(parents=True, exist_ok=True)
+    stamps = bytearray(128)  # stamp zero remains unused
+    stamps.extend(tile_bytes(road_pixel))
+    stamps.extend(tile_bytes(grass_pixel))
+    (destination / "road-stamps.bin").write_bytes(stamps)
+    trace = bytearray()
+    for frame in range(PERIOD):
+        for line in lines(frame):
+            for word in line:
+                trace.extend((word & 0xFFFF).to_bytes(2, "big"))
+    (destination / "road-traces.bin").write_bytes(trace)
+    checksums = []
+    for frame in range(FRAMES):
+        words = output_words(frame)
+        checksums.append(sum(words))
+    (destination / "road-sums.inc").write_text(
+        "/* Expected 64x64 road output word sums, 60 deterministic frames. */\n"
+        + "\n".join(f"    .long 0x{value:08x}" for value in checksums) + "\n"
+    )
+
+
+if __name__ == "__main__":
+    main()

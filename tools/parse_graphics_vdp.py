@@ -17,6 +17,9 @@ def main():
     parser.add_argument("--frames", type=int, default=120)
     parser.add_argument("--size", type=int, choices=(32, 64), default=32)
     parser.add_argument("--strategy", default="asic")
+    parser.add_argument("--road", action="store_true",
+                        help="label the cyclic case IDs as one perspective-road sequence")
+    parser.add_argument("--source-commit", default="4c3ace15641d2ed90b5d069d1627bd3374a2996f")
     parser.add_argument("--reverse-transfer", action="store_true")
     parser.add_argument("--dma-only", action="store_true")
     args = parser.parse_args()
@@ -38,7 +41,8 @@ def main():
             raise SystemExit(f"unexpected frame sequence at {index}: {values}")
         frames.append({
             "frame": frame,
-            "transform": ("scale", "rotate", "combined")[case - case_base],
+            "transform": ("perspective_road" if args.road else
+                          ("scale", "rotate", "combined")[case - case_base]),
             "transfer": ("cpu_direct_from_word_ram", "dma_from_main_ram_staging")[mode],
             "vblank_start_interval_ticks": None if index == 0 else interval,
             "staging_ticks": stage,
@@ -65,10 +69,12 @@ def main():
         }
     intervals = [f["vblank_start_interval_ticks"] for f in frames[1:]]
     result = {
-        "test_id": f"phase1-graphics-vdp-{args.size}x{args.size}-{args.strategy}-{args.frames}-frames",
+        "test_id": (f"perspective-road-{args.size}x{args.size}-{args.frames}-frames"
+                    if args.road else
+                    f"phase1-graphics-vdp-{args.size}x{args.size}-{args.strategy}-{args.frames}-frames"),
         "status": "pass",
         "evidence_level": "verified by execution",
-        "git_commit": "4c3ace15641d2ed90b5d069d1627bd3374a2996f",
+        "git_commit": args.source_commit,
         "build_id": (hashlib.sha256(args.disc_image.read_bytes()).hexdigest()
                      if args.disc_image else "251117a070e586f56a3b641384b9da7c72e3806f38dce75d70cff623fbb0c087"),
         "source_tree_dirty_at_execution": True,
@@ -101,7 +107,10 @@ def main():
         },
         "physical_hardware_tested": False,
         "artifact_paths": [str(args.log), str(args.output)],
-        "notes": "ASIC output checksum checked in-program before every upload; no hardware validation.",
+        "notes": ("ASIC perspective-road output checksum checked in-program before every upload; "
+                  "curvature, elevation and banking are deterministic trace-table cues; "
+                  "no hardware validation." if args.road else
+                  "ASIC output checksum checked in-program before every upload; no hardware validation."),
         "output_width": args.size,
         "output_height": args.size,
         "bytes_transferred_per_frame": args.size * args.size // 2,

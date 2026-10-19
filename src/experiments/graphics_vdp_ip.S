@@ -1,4 +1,4 @@
-/* ASIC 32x32 image to Genesis VDP, direct CPU upload versus staged DMA. */
+/* ASIC image to Genesis VDP; build flags select size, pacing, and transfer path. */
 .section .text
 .global _start
 .equ VDP_DATA,0xc00000
@@ -271,16 +271,24 @@ sum_loop:
     move.w (%a2)+,%d0
     add.l %d0,%d2
     dbf %d1,sum_loop
+.ifdef ROAD_TRACE
+    move.w %d6,%d0
+.else
 .ifdef ANIMATE_TRACE
     move.w %d6,%d0
 .else
     move.w %d7,%d0
 .endif
+.endif
     lsl.w #2,%d0
+.ifdef ROAD_TRACE
+    lea road_sums(%pc),%a2
+.else
 .ifdef ANIMATE_TRACE
     lea animation_sums(%pc),%a2
 .else
     lea expected_sums(%pc),%a2
+.endif
 .endif
     cmp.l 0(%a2,%d0.w),%d2
     bne fail_checksum
@@ -350,13 +358,24 @@ plane_commands:
     .long 0x461c0003,0x469c0003,0x471c0003,0x479c0003
 .endif
 palette:
+.ifdef ROAD_TRACE
+    .word 0x0000,0x0000,0x00a0,0x0060
+    .word 0x0000,0x0000,0x0000,0x0888
+    .word 0x0000,0x0000,0x000e,0x0000
+    .word 0x0000,0x0000,0x00ee,0x0eee
+.else
     .word 0x0000,0x000e,0x00e0,0x0e00
     .word 0x00ee,0x0e0e,0x0ee0,0x0888
     .word 0x0444,0x0008,0x0080,0x0800
     .word 0x0088,0x0808,0x0880,0x0eee
+.endif
 expected_sums:
     .include "build/graphics-asic-bench/expected-sums.inc"
 .ifdef ANIMATE_TRACE
 animation_sums:
     .include "build/graphics-asic-bench/animation-32-sums.inc"
+.endif
+.ifdef ROAD_TRACE
+road_sums:
+    .include "build/perspective-road/road-sums.inc"
 .endif
