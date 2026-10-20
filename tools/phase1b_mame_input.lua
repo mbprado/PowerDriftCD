@@ -6,10 +6,18 @@ local steering = assert(ports[":ADC.5"].fields["Paddle"])
 local screen = assert(manager.machine.screens[":screen"])
 local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
-local ram_space = ram_output and assert(manager.machine.devices[":maincpu"].spaces["program"])
+local ram_space = (ram_output or os.getenv("PDRIFT_DEBUG_WATCH") == "1")
+  and assert(manager.machine.devices[":maincpu"].spaces["program"])
 local steer_pulse = tonumber(os.getenv("PDRIFT_STEER_PULSE") or "")
 assert(not steer_pulse or (steer_pulse >= 32 and steer_pulse <= 224))
 local frames = 0
+local debug_watch = os.getenv("PDRIFT_DEBUG_WATCH") == "1"
+local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
+local watchpoints = {}
+if debug_watch then
+  assert(manager.machine.debugger)
+  manager.machine.debugger.execution_state = "run"
+end
 local captures = { [300] = true, [600] = true, [900] = true,
                    [1020] = true, [1080] = true, [1140] = true,
                    [1200] = true, [1500] = true, [1800] = true }
@@ -45,6 +53,16 @@ emu.register_frame_done(function()
   if steer_pulse and frames == 960 then
     steering:set_value(steer_pulse)
     print(string.format("INPUT,960,steer-%d", steer_pulse))
+  end
+  if debug_watch and frames == 960 then
+    local action = 'printf "WATCH addr=%06X data=%08X pc=%06X sp=%06X\\n",wpaddr,wpdata,pc,a7;g'
+    watchpoints[1] = cpu_debug:wpset(ram_space, "w", 0x1fff72, 2, "wpdata!=3d00", action)
+    watchpoints[2] = cpu_debug:wpset(ram_space, "w", 0x1fffc4, 2, "1", action)
+    print(string.format("WATCH_ARMED,%s,%s", tostring(watchpoints[1]), tostring(watchpoints[2])))
+  end
+  if debug_watch and frames == 1020 then
+    for _, index in ipairs(watchpoints) do cpu_debug:wpclear(index) end
+    print("WATCH_CLEARED,1020")
   end
   if steer_pulse and frames == 1080 then
     steering:set_value(128)

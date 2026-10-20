@@ -15,9 +15,11 @@ def main():
     parser.add_argument("center2", type=Path)
     parser.add_argument("pulse1", type=Path)
     parser.add_argument("pulse2", type=Path)
+    parser.add_argument("--left", type=Path, nargs=2, metavar=("LEFT1", "LEFT2"))
     args = parser.parse_args()
     runs = (args.center1, args.center2, args.pulse1, args.pulse2)
     changes = {name: [] for name in WINDOWS}
+    left_changes = {name: [] for name in WINDOWS}
 
     for frame in FRAMES:
         for name, base in WINDOWS.items():
@@ -33,13 +35,29 @@ def main():
                 raise ValueError(f"pre-pulse divergence: frame={frame} window={name}")
             if frame > 960:
                 changes[name].append(offsets)
-            print(f"{frame},{name},{len(offsets)}")
+            if args.left:
+                left = tuple((run / f"ram-{frame:04d}-{name}.bin").read_bytes()
+                             for run in args.left)
+                if any(len(data) != SIZE for data in left) or left[0] != left[1]:
+                    raise ValueError(f"left repeat mismatch: frame={frame} window={name}")
+                left_offsets = {offset for offset, (a, b) in enumerate(zip(captures[0], left[0]))
+                                if a != b}
+                if frame <= 960 and left_offsets:
+                    raise ValueError(f"left pre-pulse divergence: frame={frame} window={name}")
+                if frame > 960:
+                    left_changes[name].append(left_offsets)
+                left_right = sum(a != b for a, b in zip(left[0], captures[2]))
+                print(f"{frame},{name},{len(offsets)},{len(left_offsets)},{left_right}")
+            else:
+                print(f"{frame},{name},{len(offsets)}")
 
     for name, base in WINDOWS.items():
         common = set.intersection(*changes[name])
         addresses = (" ".join(f"{base + offset:06X}" for offset in sorted(common))
                      if len(common) <= 64 else "too_many_to_list")
         print(f"stable_post_pulse,{name},{len(common)},{addresses}")
+        if args.left:
+            print(f"stable_left_post_pulse,{name},{len(set.intersection(*left_changes[name]))}")
 
 
 if __name__ == "__main__":
