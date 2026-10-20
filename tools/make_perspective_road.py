@@ -11,6 +11,17 @@ SIZE = 64
 PERIOD = 24
 FRAMES = 60
 
+COMPARE_GLYPHS = {
+    "P": ("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
+    "R": ("11110", "10001", "10001", "11110", "10100", "10010", "10001"),
+    "E": ("11111", "10000", "10000", "11110", "10000", "10000", "11111"),
+    "U": ("10001", "10001", "10001", "10001", "10001", "10001", "01110"),
+    "N": ("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
+    "T": ("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
+    "I": ("11111", "00100", "00100", "00100", "00100", "00100", "11111"),
+    "M": ("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
+}
+
 
 def road_pixel(x, y):
     if x in (0, 15):
@@ -74,9 +85,30 @@ def source_pixel(sx, sy):
     return pixel(sx % 16, sy % 16)
 
 
-def output_words(frame):
+CURVE_SINE = [round(5 * math.sin(2 * math.pi * index / 96))
+              for index in range(96)]
+RIDGE_SINE = [round(6 * math.sin(2 * math.pi * index / 192))
+              for index in range(192)]
+
+
+def full_camera_lines(frame):
+    """Derive scanline curve/ridge from phase plus small shared sine tables."""
+    state = frame % PERIOD
+    bank, horizon, _ = compact_state(state)
+    for y in range(SIZE):
+        depth = max(0, y - horizon)
+        dx_eighth = (16, 12, 8, 4)[min(3, depth // 15)]
+        curve = CURVE_SINE[(4 * state + y) % 96]
+        ridge = RIDGE_SINE[(8 * state + 3 * y) % 192]
+        bank_shift = bank * (y - SIZE // 2) // 8
+        source_y = 20 + 3 * depth - depth * depth // 48 + ridge + 2 * state
+        yield ((136 + curve + bank_shift) * 8 - 32 * dx_eighth,
+               source_y * 8 - 32 * bank, dx_eighth * 256, bank * 256)
+
+
+def output_words(frame, line_factory=lines):
     image = []
-    trace_lines = list(lines(frame))
+    trace_lines = list(line_factory(frame))
     for x_cell in range(SIZE // 8):
         for y_cell in range(SIZE // 8):
             for local_y in range(8):
@@ -92,6 +124,17 @@ def output_words(frame):
                     image.append(sum(value << (12 - 4 * index)
                                      for index, value in enumerate(pixels)))
     return image
+
+
+def compare_font():
+    """Eight original 5x7 glyphs, VDP tile IDs 65..72 after the road tiles."""
+    tiles = bytearray()
+    for letter in "PREUNTIM":
+        for row in (*COMPARE_GLYPHS[letter], "00000"):
+            pixels = "0" + row + "00"
+            tiles.extend((int(pixels[i]) * 15 << 4) | int(pixels[i + 1]) * 15
+                         for i in range(0, 8, 2))
+    return bytes(tiles)
 
 
 def main():
@@ -118,6 +161,17 @@ def main():
                 trace.extend((word & 0xFFFF).to_bytes(2, "big"))
     (destination / "road-traces.bin").write_bytes(trace)
     (destination / "road-compact.bin").write_bytes(compact)
+    (destination / "road-compare-font.bin").write_bytes(compare_font())
+    (destination / "road-camera-params.bin").write_bytes(bytes(
+        value & 0xFF for frame in range(PERIOD)
+        for value in compact_state(frame)[:2]
+    ))
+    (destination / "road-curve-sine.bin").write_bytes(bytes(
+        value & 0xFF for value in CURVE_SINE
+    ))
+    (destination / "road-ridge-sine.bin").write_bytes(bytes(
+        value & 0xFF for value in RIDGE_SINE
+    ))
     checksums = []
     for frame in range(FRAMES):
         words = output_words(frame)
@@ -125,6 +179,12 @@ def main():
     (destination / "road-sums.inc").write_text(
         "/* Expected 64x64 road output word sums, 60 deterministic frames. */\n"
         + "\n".join(f"    .long 0x{value:08x}" for value in checksums) + "\n"
+    )
+    full_sums = [sum(output_words(frame, full_camera_lines))
+                 for frame in range(FRAMES)]
+    (destination / "road-full-camera-sums.inc").write_text(
+        "/* Expected 64x64 ASIC output from phase-indexed sine tables. */\n"
+        + "\n".join(f"    .long 0x{value:08x}" for value in full_sums) + "\n"
     )
 
 

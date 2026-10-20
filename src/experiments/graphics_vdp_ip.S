@@ -48,6 +48,14 @@ palette_loop:
 clear_vram:
     move.w %d0,(%a1)
     dbf %d1,clear_vram
+.ifdef ROAD_COMPARE
+    move.l #0x48200000,(%a0) /* original label tiles at VRAM $0820 */
+    lea road_compare_font(%pc),%a2
+    move.w #127,%d0
+compare_font_copy:
+    move.w (%a2)+,(%a1)
+    dbf %d0,compare_font_copy
+.endif
     lea plane_commands(%pc),%a2
     moveq #0,%d0 /* row */
 plane_row:
@@ -69,6 +77,10 @@ plane_column:
     addq.w #1,%d0
     cmpi.w #TILE_DIM,%d0
     bne.s plane_row
+.ifdef ROAD_COMPARE
+    moveq #0,%d6
+    bsr draw_mode_label
+.endif
     move.w #0x8144,(%a0) /* display on */
 
     move.w #0x574d,0xa1201e
@@ -137,6 +149,15 @@ wait_vblank_start:
 .endif
     move.w %d2,(%a6)+ /* 0 CPU, 1 staged DMA */
     move.w %d1,(%a6)+ /* frame interval, first sample ignored */
+.ifdef ROAD_COMPARE
+    tst.w %d6
+    beq.s compare_switch_label
+    cmpi.w #72,%d6
+    bne.s compare_label_done
+compare_switch_label:
+    bsr draw_mode_label
+compare_label_done:
+.endif
     tst.w %d2
     bne staged_dma
 cpu_upload:
@@ -212,13 +233,23 @@ upload_done:
 .endif
 
     addq.w #1,%d6
+.ifdef ROAD_COMPARE
+    cmpi.w #144,%d6 /* three 24-state loops of each mode */
+    bne.s compare_next_frame
+    moveq #0,%d6
+    lea RESULTS,%a6 /* bounded circular debugger evidence */
+compare_next_frame:
+.else
     cmpi.w #FRAMES,%d6
     beq all_done
+.endif
+.ifndef ROAD_COMPARE
     move.w %d6,%d0
     divu.w #3,%d0
     swap %d0
     move.w %d0,%d7
     addq.w #CASE_BASE,%d7
+.endif
     bsr request_asic
 .ifdef PRESTAGE_DMA
 .ifndef ROAD_RUNTIME_COMBINED
@@ -236,6 +267,26 @@ all_done:
     move.l #0x47564f4b,%d3 /* GVOK */
     bra idle
 
+.ifdef ROAD_COMPARE
+draw_mode_label:
+    move.l #0x44180003,(%a0) /* plane A, row 8, column 12 */
+    cmpi.w #72,%d6
+    bge.s label_runtime
+    lea label_pre(%pc),%a2
+    clr.w ERROR+0x20
+    bra.s label_words
+label_runtime:
+    lea label_runtime_words(%pc),%a2
+    move.w #1,ERROR+0x20
+label_words:
+    move.w %d6,ERROR+0x22
+    move.w #6,%d0
+label_copy:
+    move.w (%a2)+,(%a1)
+    dbf %d0,label_copy
+    rts
+.endif
+
 request_asic:
 .ifdef PRECOMPUTED
     move.w %d6,%d0
@@ -247,9 +298,22 @@ request_asic:
     adda.w %d0,%a5
     moveq #0,%d4 /* no per-frame ownership/ASIC path */
 .else
+.ifdef ROAD_COMPARE
+    moveq #0,%d0
+    move.w %d6,%d0
+    divu.w #24,%d0
+    swap %d0 /* camera state 0..23 */
+    lsl.w #4,%d0
+    or.w %d7,%d0
+    cmpi.w #72,%d6
+    blt.s compare_command_ready
+    ori.w #8,%d0 /* tell sub-CPU to build the trace */
+compare_command_ready:
+.else
     move.w %d6,%d0
     lsl.w #4,%d0
     or.w %d7,%d0
+.endif
     ori.w #0x5000,%d0
     move.w %d0,0xa1201e
     move.w %d0,%d2
@@ -304,7 +368,14 @@ sum_loop:
     move.w %d0,PRESTAGE_TICKS /* checksum and staging together */
 .endif
 .ifdef ROAD_TRACE
+.ifdef ROAD_COMPARE
+    moveq #0,%d0
     move.w %d6,%d0
+    divu.w #24,%d0
+    swap %d0
+.else
+    move.w %d6,%d0
+.endif
 .else
 .ifdef ANIMATE_TRACE
     move.w %d6,%d0
@@ -409,5 +480,17 @@ animation_sums:
 .endif
 .ifdef ROAD_TRACE
 road_sums:
+.ifdef ROAD_FULL_CAMERA
+    .include "build/perspective-road/road-full-camera-sums.inc"
+.else
     .include "build/perspective-road/road-sums.inc"
+.endif
+.endif
+.ifdef ROAD_COMPARE
+label_pre:
+    .word 65,66,67,0,0,0,0
+label_runtime_words:
+    .word 66,68,69,70,71,72,67
+road_compare_font:
+    .incbin "build/perspective-road/road-compare-font.bin"
 .endif

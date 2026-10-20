@@ -25,6 +25,9 @@ interrupt:
     move.w 0xff801e,%d7
     cmpi.w #0x574d,%d7
     beq mode_ready
+    .ifdef ROAD_COMPARE
+    moveq #0,%d0
+    .endif
     move.w %d7,%d0
     andi.w #0xf000,%d0
     cmpi.w #0x5000,%d0
@@ -56,6 +59,17 @@ road_map:
     andi.w #0x00ff,%d0
     divu.w #24,%d0
     swap %d0 /* remainder: 0..23 */
+    .ifdef ROAD_COMPARE
+    btst #3,%d7 /* comparison command bit: 0 full trace, 1 runtime trace */
+    bne.s compare_runtime_data
+    mulu.w #512,%d0
+    lea road_traces(%pc),%a0
+    bra.s compare_data_ready
+compare_runtime_data:
+    mulu.w #132,%d0
+    lea road_compact(%pc),%a0
+compare_data_ready:
+    .else
     .ifdef RUNTIME_TRACE
     mulu.w #132,%d0 /* 4 camera bytes + 64 curve/ridge pairs */
     lea road_compact(%pc),%a0
@@ -63,8 +77,13 @@ road_map:
     mulu.w #512,%d0 /* 64 scanlines, 8 trace bytes each */
     lea road_traces(%pc),%a0
     .endif
+    .endif
     lea 0(%a0,%d0.w),%a0
     lea 0x0b0000,%a1
+    .ifdef ROAD_COMPARE
+    btst #3,%d7
+    beq compare_copy_trace
+    .endif
     .ifdef RUNTIME_TRACE
     move.w 0xff800c,0x098004
     movea.l %a0,%a2
@@ -140,6 +159,20 @@ scale_ready:
     sub.w 0x098004,%d0
     andi.w #0x0fff,%d0
     move.w %d0,0x098002 /* isolated trace preparation window */
+    .ifdef ROAD_COMPARE
+    bra trace_ready
+compare_copy_trace:
+    move.w 0xff800c,0x098004
+    move.w #255,%d0
+compare_copy_loop:
+    move.w (%a0)+,(%a1)+
+    dbf %d0,compare_copy_loop
+    move.w 0xff800c,%d0
+    sub.w 0x098004,%d0
+    andi.w #0x0fff,%d0
+    move.w %d0,0x098002
+trace_ready:
+    .endif
     .else
     move.w #255,%d0
 copy_trace:
@@ -192,10 +225,16 @@ user_call:
 road_stamps:
     .incbin "build/perspective-road/road-stamps.bin"
 road_traces:
+    .ifdef ROAD_COMPARE
+    .incbin "build/perspective-road/road-traces.bin"
+road_compact:
+    .incbin "build/perspective-road/road-compact.bin"
+    .else
     .ifndef RUNTIME_TRACE
     .incbin "build/perspective-road/road-traces.bin"
     .else
 road_compact:
     .incbin "build/perspective-road/road-compact.bin"
+    .endif
     .endif
 module_end:
