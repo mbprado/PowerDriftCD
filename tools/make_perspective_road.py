@@ -151,24 +151,33 @@ def live_camera_packet(frame):
     return curve, ridge, bank, horizon, texture
 
 
-def live_camera_lines(frame):
+def live_camera_lines(frame, width=SIZE):
     """Host reference for per-update main-to-sub camera packets."""
+    if width not in (64, 128):
+        raise ValueError(f"unsupported road width: {width}")
     curve_phase, ridge_phase, bank, horizon, texture_phase = live_camera_packet(frame)
     for y in range(SIZE):
         depth = max(0, y - horizon)
-        dx_eighth = (16, 12, 8, 4)[min(3, depth // 15)]
+        dx_eighth = ((16, 12, 8, 4) if width == 64 else
+                     (12, 8, 6, 4))[min(3, depth // 15)]
         curve = CURVE_SINE[(curve_phase + y) % len(CURVE_SINE)]
         ridge = RIDGE_SINE[(ridge_phase + 3 * y) % len(RIDGE_SINE)]
         bank_shift = bank * (y - SIZE // 2) // 8
-        source_y = 20 + 3 * depth - depth * depth // 48 + ridge + texture_phase
-        yield ((136 + curve + bank_shift) * 8 - 32 * dx_eighth,
-               source_y * 8 - 32 * bank, dx_eighth * 256, bank * 256)
+        source_y = (20 + (8 if width == 128 else 0) + 3 * depth
+                    - depth * depth // 48 + ridge + texture_phase)
+        yield ((136 + curve + bank_shift) * 8 - (width // 2) * dx_eighth,
+               source_y * 8 - (width // 2) * bank,
+               dx_eighth * 256, bank * 256)
 
 
-def output_words(frame, line_factory=lines):
+def wide_live_camera_lines(frame):
+    return live_camera_lines(frame, width=128)
+
+
+def output_words(frame, line_factory=lines, width=SIZE):
     image = []
     trace_lines = list(line_factory(frame))
-    for x_cell in range(SIZE // 8):
+    for x_cell in range(width // 8):
         for y_cell in range(SIZE // 8):
             for local_y in range(8):
                 y = y_cell * 8 + local_y
@@ -261,6 +270,12 @@ def main():
     (destination / "road-live-camera-sums.inc").write_text(
         "/* Expected ASIC output from five-word main-to-sub camera packets. */\n"
         + "\n".join(f"    .long 0x{value:08x}" for value in live_sums) + "\n"
+    )
+    wide_sums = [sum(output_words(frame, wide_live_camera_lines, width=128))
+                 for frame in range(FRAMES)]
+    (destination / "road-live-camera-wide-sums.inc").write_text(
+        "/* Expected 128x64 ASIC output from live camera packets. */\n"
+        + "\n".join(f"    .long 0x{value:08x}" for value in wide_sums) + "\n"
     )
 
 

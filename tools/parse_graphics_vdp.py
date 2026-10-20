@@ -16,6 +16,8 @@ def main():
     parser.add_argument("--disc-image", type=Path)
     parser.add_argument("--frames", type=int, default=120)
     parser.add_argument("--size", type=int, choices=(32, 64), default=32)
+    parser.add_argument("--width", type=int, choices=(64, 128),
+                        help="horizontal output pixels; defaults to --size")
     parser.add_argument("--strategy", default="asic")
     parser.add_argument("--road", action="store_true",
                         help="label the cyclic case IDs as one perspective-road sequence")
@@ -29,6 +31,7 @@ def main():
     parser.add_argument("--reverse-transfer", action="store_true")
     parser.add_argument("--dma-only", action="store_true")
     args = parser.parse_args()
+    width = args.width or args.size
     if (args.expected_interval_min is None) != (args.expected_interval_max is None):
         parser.error("both expected interval bounds are required")
     if (args.expected_interval_min is not None and
@@ -89,7 +92,7 @@ def main():
                       if args.expected_interval_min is not None else None)
     upload_misses = sum(not f["vblank_asserted_after_upload"] for f in frames)
     result = {
-        "test_id": (f"perspective-road-{args.strategy}-{args.size}x{args.size}-{args.frames}-frames"
+        "test_id": (f"perspective-road-{args.strategy}-{width}x{args.size}-{args.frames}-frames"
                     if args.road else
                     f"phase1-graphics-vdp-{args.size}x{args.size}-{args.strategy}-{args.frames}-frames"),
         "status": "fail" if (upload_misses or cadence_misses) else "pass",
@@ -116,7 +119,7 @@ def main():
             "sub_cpu_cycles": None,
             "asic_cycles": None,
             "word_ram_swaps": None,
-            "vdp_transfer_bytes": args.frames * args.size * args.size // 2,
+            "vdp_transfer_bytes": args.frames * width * args.size // 2,
             "deadline_misses": upload_misses,
             "cadence_deadline_misses": cadence_misses,
         },
@@ -132,7 +135,7 @@ def main():
         "artifact_paths": [str(args.log), str(args.output)],
         "notes": ("ASIC perspective-road output checksum checked in-program before every upload; "
                   "five camera words sent from main CPU to sub-CPU on each update; "
-                  "no hardware validation." if args.strategy == "road-runtime-live" else
+                  "no hardware validation." if args.strategy.startswith("road-runtime-live") else
                   "ASIC perspective-road output checksum checked in-program before every upload; "
                   "four camera controls evolve separately from frame index on the sub-CPU using shared lookup tables; "
                   "no hardware validation." if args.strategy == "road-runtime-independent" else
@@ -140,9 +143,9 @@ def main():
                   "curvature, elevation and banking are deterministic trace-table cues; "
                   "no hardware validation." if args.road else
                   "ASIC output checksum checked in-program before every upload; no hardware validation."),
-        "output_width": args.size,
+        "output_width": width,
         "output_height": args.size,
-        "bytes_transferred_per_frame": args.size * args.size // 2,
+        "bytes_transferred_per_frame": width * args.size // 2,
         "frames_requested": args.frames,
         "frames_executed": args.frames,
         "vblank_interval_ticks_min_median_max": [min(intervals), statistics.median(intervals), max(intervals)],

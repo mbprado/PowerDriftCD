@@ -10,14 +10,23 @@
 .equ PRESTAGE_TICKS,0xff2ff0
 .equ READY_TICKS,0xff2ff2
 .equ VERIFY_STAGE_START,0xff2ff4
+.ifdef ROAD_WIDE
+.equ TILE_COLUMNS,16
+.equ TILE_ROWS,8
+.equ COPY_WORDS,2048
+.equ CASE_BASE,6
+.else
 .ifdef SIZE_64
-.equ TILE_DIM,8
+.equ TILE_COLUMNS,8
+.equ TILE_ROWS,8
 .equ COPY_WORDS,1024
 .equ CASE_BASE,6
 .else
-.equ TILE_DIM,4
+.equ TILE_COLUMNS,4
+.equ TILE_ROWS,4
 .equ COPY_WORDS,256
 .equ CASE_BASE,3
+.endif
 .endif
 .ifdef FRAME_DIV_2
 .equ FRAMES,60
@@ -72,10 +81,10 @@ plane_column:
     addq.w #1,%d2
     move.w %d2,(%a1)
     addq.w #1,%d1
-    cmpi.w #TILE_DIM,%d1
+    cmpi.w #TILE_COLUMNS,%d1
     bne.s plane_column
     addq.w #1,%d0
-    cmpi.w #TILE_DIM,%d0
+    cmpi.w #TILE_ROWS,%d0
     bne.s plane_row
 .ifdef ROAD_COMPARE
     moveq #0,%d6
@@ -112,6 +121,12 @@ wait_main:
 .endif
 frame_loop:
 .ifdef FRAME_DIV_2
+.ifdef ROAD_ADAPTIVE_PACING
+    /* Work completed after the intervening VBlank: wait only for the next edge. */
+    move.w READY_TICKS,%d0
+    cmpi.w #544,%d0 /* measured NTSC VBlank spacing is about 543 ticks */
+    bge.s wait_vblank_end
+.endif
     /* Skip one complete VBlank so uploads target 30 Hz. */
 skip_vblank_end:
     move.w (%a0),%d0
@@ -198,10 +213,14 @@ stage_copy:
 .endif
     move.w #0x8154,(%a0) /* DMA on, display on */
     move.w #0x9300,(%a0) /* low byte of DMA length */
+.ifdef ROAD_WIDE
+    move.w #0x9408,(%a0) /* 2048 words */
+.else
 .ifdef SIZE_64
     move.w #0x9404,(%a0) /* 1024 words */
 .else
     move.w #0x9401,(%a0)
+.endif
 .endif
     move.w #0x9500,(%a0) /* $FF6000 / 2 = $7FB000 */
     move.w #0x96b0,(%a0)
@@ -492,7 +511,11 @@ animation_sums:
 .ifdef ROAD_TRACE
 road_sums:
 .ifdef ROAD_LIVE_CAMERA
+.ifdef ROAD_WIDE
+    .include "build/perspective-road/road-live-camera-wide-sums.inc"
+.else
     .include "build/perspective-road/road-live-camera-sums.inc"
+.endif
 .else
 .ifdef ROAD_INDEPENDENT
     .include "build/perspective-road/road-independent-camera-sums.inc"

@@ -72,7 +72,11 @@ build_trace:
     bpl.s depth_ready
     moveq #0,%d2
 depth_ready:
+.ifdef ROAD_WIDE
+    moveq #12,%d1
+.else
     moveq #16,%d1
+.endif
     cmpi.w #45,%d2
     blt.s test_middle
     moveq #4,%d1
@@ -80,12 +84,20 @@ depth_ready:
 test_middle:
     cmpi.w #30,%d2
     blt.s test_near
+.ifdef ROAD_WIDE
+    moveq #6,%d1
+.else
     moveq #8,%d1
+.endif
     bra.s scale_ready
 test_near:
     cmpi.w #15,%d2
     blt.s scale_ready
+.ifdef ROAD_WIDE
+    moveq #8,%d1
+.else
     moveq #12,%d1
+.endif
 scale_ready:
     move.b (%a0)+,%d4
     ext.w %d4 /* signed curve sample */
@@ -101,7 +113,11 @@ curve_index_ready:
     addi.w #136,%d0
     lsl.w #3,%d0
     move.w %d1,%d4
+.ifdef ROAD_WIDE
+    lsl.w #6,%d4
+.else
     lsl.w #5,%d4
+.endif
     sub.w %d4,%d0
     move.w %d0,(%a1)+ /* source X start */
 
@@ -119,12 +135,20 @@ ridge_index_ready:
     move.w %d2,%d0
     mulu.w #3,%d0
     add.w %d0,%d4
+.ifdef ROAD_WIDE
+    addi.w #28,%d4
+.else
     addi.w #20,%d4
+.endif
     move.w 0x098006,%d0
     add.w %d0,%d4
     lsl.w #3,%d4
     move.w %d5,%d0
+.ifdef ROAD_WIDE
+    lsl.w #6,%d0
+.else
     lsl.w #5,%d0
+.endif
     sub.w %d0,%d4
     move.w %d4,(%a1)+ /* source Y start */
     move.w %d1,%d0
@@ -141,7 +165,11 @@ ridge_index_ready:
     andi.w #0x0fff,%d0
     move.w %d0,0x098002 /* isolated trace preparation window */
     lea 0x090000,%a1
+.ifdef ROAD_WIDE
+    move.w #2047,%d0
+.else
     move.w #1023,%d0
+.endif
 clear_output:
     move.w #0xffff,(%a1)+
     dbf %d0,clear_output
@@ -151,7 +179,11 @@ clear_output:
     move.w #7,0xff805c
     move.w #0x4000,0xff805e
     move.w #0,0xff8060
+.ifdef ROAD_WIDE
+    move.w #128,0xff8062
+.else
     move.w #64,0xff8062
+.endif
     move.w #64,0xff8064
     move.w 0xff800c,%d2
     move.w #0xc000,0xff8066
