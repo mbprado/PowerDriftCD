@@ -106,6 +106,29 @@ def full_camera_lines(frame):
                source_y * 8 - 32 * bank, dx_eighth * 256, bank * 256)
 
 
+def triangle_phase(frame, multiplier):
+    phase = frame * multiplier % PERIOD
+    return min(phase, PERIOD - phase)
+
+
+def independent_camera_lines(frame):
+    """Four separately evolving, sub-CPU-computable camera controls."""
+    bank = triangle_phase(frame, 7) // 3 - 2
+    horizon = 1 + triangle_phase(frame, 11) // 2
+    curve_phase = frame * 2 % len(CURVE_SINE)
+    ridge_phase = frame * 5 % len(RIDGE_SINE)
+    texture_phase = 2 * (frame % PERIOD)
+    for y in range(SIZE):
+        depth = max(0, y - horizon)
+        dx_eighth = (16, 12, 8, 4)[min(3, depth // 15)]
+        curve = CURVE_SINE[(curve_phase + y) % len(CURVE_SINE)]
+        ridge = RIDGE_SINE[(ridge_phase + 3 * y) % len(RIDGE_SINE)]
+        bank_shift = bank * (y - SIZE // 2) // 8
+        source_y = 20 + 3 * depth - depth * depth // 48 + ridge + texture_phase
+        yield ((136 + curve + bank_shift) * 8 - 32 * dx_eighth,
+               source_y * 8 - 32 * bank, dx_eighth * 256, bank * 256)
+
+
 def output_words(frame, line_factory=lines):
     image = []
     trace_lines = list(line_factory(frame))
@@ -185,6 +208,12 @@ def main():
     (destination / "road-full-camera-sums.inc").write_text(
         "/* Expected 64x64 ASIC output from phase-indexed sine tables. */\n"
         + "\n".join(f"    .long 0x{value:08x}" for value in full_sums) + "\n"
+    )
+    independent_sums = [sum(output_words(frame, independent_camera_lines))
+                        for frame in range(FRAMES)]
+    (destination / "road-independent-camera-sums.inc").write_text(
+        "/* Expected ASIC output from independently evolving camera controls. */\n"
+        + "\n".join(f"    .long 0x{value:08x}" for value in independent_sums) + "\n"
     )
 
 

@@ -480,10 +480,14 @@ animation_sums:
 .endif
 .ifdef ROAD_TRACE
 road_sums:
+.ifdef ROAD_INDEPENDENT
+    .include "build/perspective-road/road-independent-camera-sums.inc"
+.else
 .ifdef ROAD_FULL_CAMERA
     .include "build/perspective-road/road-full-camera-sums.inc"
 .else
     .include "build/perspective-road/road-sums.inc"
+.endif
 .endif
 .endif
 .ifdef ROAD_COMPARE

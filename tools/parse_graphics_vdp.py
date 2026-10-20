@@ -131,7 +131,10 @@ def main():
         "physical_hardware_tested": False,
         "artifact_paths": [str(args.log), str(args.output)],
         "notes": ("ASIC perspective-road output checksum checked in-program before every upload; "
-            "curvature, elevation and banking are deterministic trace-table cues; "
+                  "four camera controls evolve separately from frame index on the sub-CPU using shared lookup tables; "
+                  "no hardware validation." if args.strategy == "road-runtime-independent" else
+                  "ASIC perspective-road output checksum checked in-program before every upload; "
+                  "curvature, elevation and banking are deterministic trace-table cues; "
                   "no hardware validation." if args.road else
                   "ASIC output checksum checked in-program before every upload; no hardware validation."),
         "output_width": args.size,
