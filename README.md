@@ -19,14 +19,18 @@
 4. Review the initial GitHub issue before writing game engine code.
 
 ## Roadmap
-0. Toolchain + debugger + emulator evaluation
-1. Sega CD hardware characterization
-2. Banking/elevation road renderer
-3. Sprite/object renderer
-4. Combined renderer and profiling
-5. Arcade-reference data adaptation
-6. Playable racing demonstration
-7. Complete game, hardware validation, release
+0. Toolchain + debugger + emulator evaluation (limited GO; original-only boot remains open)
+1. **Parallel foundations:** **1A — Sega CD hardware characterization** (ASIC/VDP/Word RAM, synthetic benchmarking) and **1B — arcade reference feasibility** (MAME Y-Board runtime traces, REA/Ghidra analysis, sprite/palette decoding). Phase 1B starts early and must not interrupt ongoing hardware experiments.
+2. Banking/elevation **road and camera renderer** — preserve the working synthetic 64×64 and 128×64/30 Hz prototypes; use a verified real arcade track/camera sample when Phase 1B provides one.
+3. Sprite/object renderer — use arcade sprite/palette findings to inform scalable scenery and vehicle assets within VDP limits.
+4. Combined renderer and profiling — integrate road, camera, objects and timing under load.
+5. Arcade **mechanics and content integration** — handling, collisions, opponents, track progression and gameplay adaptation informed by the earlier arcade research (not the first reverse-engineering effort).
+6. Playable racing demonstration.
+7. Complete game, real-hardware validation and release.
+
+**Phase 1B research order:** (1) confirm macOS/Linux REA/Ghidra and MAME tooling with locally held legal ROMs; (2) identify one reproducible arcade track section and record camera/track behavior through MAME; (3) correlate dynamic observations with code/data using REA/Ghidra; (4) catalog graphics/palette formats via suitable Y-Board viewers for Phase 3. A **single independently reproducible track/camera sample** is the first useful handoff to Phase 2, not a requirement to reverse-engineer the entire game. The current Phase 2 *synthetic* work can continue in parallel.
+
+**Scope boundary:** Phase 1B outputs are evidence, annotations, original tools and independently authored descriptions; do not commit proprietary arcade ROMs or extracted commercial assets. Keep raw traces/derived assets private pending rights review. The original-only Sega CD disc boot and stock-hardware performance remain separate unresolved gates.
 
 ## Repository layout
 - `docs/` — design decisions, experiments, hardware notes
