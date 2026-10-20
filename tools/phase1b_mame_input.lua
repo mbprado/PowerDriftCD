@@ -5,12 +5,30 @@ local pedal = assert(ports[":ADC.4"].fields["P1 Pedal 1"])
 local steering = assert(ports[":ADC.5"].fields["Paddle"])
 local screen = assert(manager.machine.screens[":screen"])
 local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
+local ram_output = os.getenv("PDRIFT_RAM_DIR")
+local ram_space = ram_output and assert(manager.machine.devices[":maincpu"].spaces["program"])
 local steer_pulse = tonumber(os.getenv("PDRIFT_STEER_PULSE") or "")
 assert(not steer_pulse or (steer_pulse >= 32 and steer_pulse <= 224))
 local frames = 0
 local captures = { [300] = true, [600] = true, [900] = true,
                    [1020] = true, [1080] = true, [1140] = true,
                    [1200] = true, [1500] = true, [1800] = true }
+local ram_captures = { [900] = true, [960] = true, [1020] = true,
+                       [1080] = true, [1140] = true, [1200] = true }
+local ram_windows = { main_low = 0x1f0000, main_high = 0x1fc000,
+                      shared = 0x0c0000 }
+local ram_size = 0x4000
+local function capture_ram(frame, name, address)
+  local bytes = {}
+  for offset = 0, ram_size - 1 do
+    bytes[#bytes + 1] = string.char(ram_space:read_u8(address + offset))
+  end
+  local path = string.format("%s/ram-%04d-%s.bin", ram_output, frame, name)
+  local file = assert(io.open(path, "wb"))
+  assert(file:write(table.concat(bytes)))
+  assert(file:close())
+  print(string.format("RAM,%d,%s,%06X,%d,%s", frame, name, address, ram_size, path))
+end
 coin:set_value(0)
 start:set_value(0)
 pedal:set_value(0)
@@ -36,5 +54,10 @@ emu.register_frame_done(function()
     local path = string.format("%s/phase1b-trial-%04d.png", output, frames)
     print(string.format("SNAPSHOT,%d,%s,%s", frames, path,
       tostring(screen:snapshot(path))))
+  end
+  if ram_output and ram_captures[frames] then
+    for name, address in pairs(ram_windows) do
+      capture_ram(frames, name, address)
+    end
   end
 end, "frame")
