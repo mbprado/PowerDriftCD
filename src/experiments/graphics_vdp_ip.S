@@ -314,6 +314,17 @@ compare_command_ready:
     lsl.w #4,%d0
     or.w %d7,%d0
 .endif
+.ifdef ROAD_LIVE_CAMERA
+    move.w %d6,%d1
+    mulu.w #10,%d1 /* five words per camera packet */
+    lea road_live_camera_packets(%pc),%a2
+    adda.w %d1,%a2
+    move.w (%a2)+,0xa12010 /* curve phase */
+    move.w (%a2)+,0xa12012 /* ridge phase */
+    move.w (%a2)+,0xa12014 /* signed bank */
+    move.w (%a2)+,0xa12016 /* horizon */
+    move.w (%a2)+,0xa12018 /* texture phase */
+.endif
     ori.w #0x5000,%d0
     move.w %d0,0xa1201e
     move.w %d0,%d2
@@ -480,6 +491,9 @@ animation_sums:
 .endif
 .ifdef ROAD_TRACE
 road_sums:
+.ifdef ROAD_LIVE_CAMERA
+    .include "build/perspective-road/road-live-camera-sums.inc"
+.else
 .ifdef ROAD_INDEPENDENT
     .include "build/perspective-road/road-independent-camera-sums.inc"
 .else
@@ -489,6 +503,11 @@ road_sums:
     .include "build/perspective-road/road-sums.inc"
 .endif
 .endif
+.endif
+.endif
+.ifdef ROAD_LIVE_CAMERA
+road_live_camera_packets:
+    .incbin "build/perspective-road/road-live-camera-packets.bin"
 .endif
 .ifdef ROAD_COMPARE
 label_pre:

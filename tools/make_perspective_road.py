@@ -129,6 +129,42 @@ def independent_camera_lines(frame):
                source_y * 8 - 32 * bank, dx_eighth * 256, bank * 256)
 
 
+def live_camera_packet(frame):
+    """Five independent command words: curve, ridge, bank, horizon, texture."""
+    base = (frame // 6) * 6
+    curve = base * 2 % len(CURVE_SINE)
+    ridge = base * 5 % len(RIDGE_SINE)
+    bank = triangle_phase(base, 7) // 3 - 2
+    horizon = 1 + triangle_phase(base, 11) // 2
+    texture = 2 * (base % PERIOD)
+    pulse = frame % 6
+    if pulse == 1:
+        curve = (curve + 17) % len(CURVE_SINE)
+    elif pulse == 2:
+        ridge = (ridge + 37) % len(RIDGE_SINE)
+    elif pulse == 3:
+        bank = bank + 1 if bank < 2 else -2
+    elif pulse == 4:
+        horizon = 1 + (horizon + 1) % 7
+    elif pulse == 5:
+        texture = (texture + 8) % 48
+    return curve, ridge, bank, horizon, texture
+
+
+def live_camera_lines(frame):
+    """Host reference for per-update main-to-sub camera packets."""
+    curve_phase, ridge_phase, bank, horizon, texture_phase = live_camera_packet(frame)
+    for y in range(SIZE):
+        depth = max(0, y - horizon)
+        dx_eighth = (16, 12, 8, 4)[min(3, depth // 15)]
+        curve = CURVE_SINE[(curve_phase + y) % len(CURVE_SINE)]
+        ridge = RIDGE_SINE[(ridge_phase + 3 * y) % len(RIDGE_SINE)]
+        bank_shift = bank * (y - SIZE // 2) // 8
+        source_y = 20 + 3 * depth - depth * depth // 48 + ridge + texture_phase
+        yield ((136 + curve + bank_shift) * 8 - 32 * dx_eighth,
+               source_y * 8 - 32 * bank, dx_eighth * 256, bank * 256)
+
+
 def output_words(frame, line_factory=lines):
     image = []
     trace_lines = list(line_factory(frame))
@@ -214,6 +250,17 @@ def main():
     (destination / "road-independent-camera-sums.inc").write_text(
         "/* Expected ASIC output from independently evolving camera controls. */\n"
         + "\n".join(f"    .long 0x{value:08x}" for value in independent_sums) + "\n"
+    )
+    packets = bytearray()
+    for frame in range(FRAMES):
+        for value in live_camera_packet(frame):
+            packets.extend((value & 0xFFFF).to_bytes(2, "big"))
+    (destination / "road-live-camera-packets.bin").write_bytes(packets)
+    live_sums = [sum(output_words(frame, live_camera_lines))
+                 for frame in range(FRAMES)]
+    (destination / "road-live-camera-sums.inc").write_text(
+        "/* Expected ASIC output from five-word main-to-sub camera packets. */\n"
+        + "\n".join(f"    .long 0x{value:08x}" for value in live_sums) + "\n"
     )
 
 
