@@ -32,3 +32,5 @@
 ## Next bounded experiment
 
 **Hypothesis:** varying only one control during callbacks 900–1500 while keeping the coin/start schedule fixed can separate player steering or acceleration effects from the repeatable road sequence. First compare screenshots and visible HUD state against the fresh-run baseline; then inspect a small, explicitly named RAM window or debugger write trace around a divergence. Candidate addresses must remain unlabeled until controlled variation and code/data references support an interpretation. The existing Sega CD five-word camera interface has not been exercised with arcade-derived values, and this test provides no evidence that it can represent the observed curve/elevation behavior. REA/Ghidra analysis and asset extraction were **not run**.
+
+**Follow-up — verified by execution:** the [bounded steering-control experiment](2026-10-20-arcade-steering-control.md) varied only the MAME paddle value during Stage 1. Two fresh pulse runs reproduced identical displayed frames and diverged from a centered control after the input changed. Internal camera and track values remain **unsupported**.
