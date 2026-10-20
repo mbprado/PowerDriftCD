@@ -4,8 +4,14 @@
 import argparse
 from pathlib import Path
 
-FRAMES = (900, 960, 1020, 1080, 1140, 1200)
-WINDOWS = {"main_low": 0x1F0000, "main_high": 0x1FC000, "shared": 0x0C0000}
+PROFILES = {
+    "baseline": ((900, 960, 1020, 1080, 1140, 1200),
+                 {"main_low": 0x1F0000, "main_high": 0x1FC000, "shared": 0x0C0000}, 960),
+    "early": ((960, 961, 962, 965, 970, 980, 1000, 1020),
+              {"main_mid1": 0x1F4000, "main_mid2": 0x1F8000,
+               "main_high": 0x1FC000, "shared_mid1": 0x0C4000,
+               "shared_mid2": 0x0C8000, "shared_high": 0x0CC000}, 961),
+}
 SIZE = 0x4000
 
 
@@ -16,13 +22,15 @@ def main():
     parser.add_argument("pulse1", type=Path)
     parser.add_argument("pulse2", type=Path)
     parser.add_argument("--left", type=Path, nargs=2, metavar=("LEFT1", "LEFT2"))
+    parser.add_argument("--profile", choices=PROFILES, default="baseline")
     args = parser.parse_args()
+    frames, windows, pre_pulse_last = PROFILES[args.profile]
     runs = (args.center1, args.center2, args.pulse1, args.pulse2)
-    changes = {name: [] for name in WINDOWS}
-    left_changes = {name: [] for name in WINDOWS}
+    changes = {name: [] for name in windows}
+    left_changes = {name: [] for name in windows}
 
-    for frame in FRAMES:
-        for name, base in WINDOWS.items():
+    for frame in frames:
+        for name, base in windows.items():
             captures = tuple((run / f"ram-{frame:04d}-{name}.bin").read_bytes()
                              for run in runs)
             if any(len(data) != SIZE for data in captures):
@@ -31,9 +39,9 @@ def main():
                 raise ValueError(f"repeat mismatch: frame={frame} window={name}")
             offsets = {offset for offset, (a, b) in enumerate(zip(captures[0], captures[2]))
                        if a != b}
-            if frame <= 960 and offsets:
+            if frame <= pre_pulse_last and offsets:
                 raise ValueError(f"pre-pulse divergence: frame={frame} window={name}")
-            if frame > 960:
+            if frame > pre_pulse_last:
                 changes[name].append(offsets)
             if args.left:
                 left = tuple((run / f"ram-{frame:04d}-{name}.bin").read_bytes()
@@ -42,16 +50,16 @@ def main():
                     raise ValueError(f"left repeat mismatch: frame={frame} window={name}")
                 left_offsets = {offset for offset, (a, b) in enumerate(zip(captures[0], left[0]))
                                 if a != b}
-                if frame <= 960 and left_offsets:
+                if frame <= pre_pulse_last and left_offsets:
                     raise ValueError(f"left pre-pulse divergence: frame={frame} window={name}")
-                if frame > 960:
+                if frame > pre_pulse_last:
                     left_changes[name].append(left_offsets)
                 left_right = sum(a != b for a, b in zip(left[0], captures[2]))
                 print(f"{frame},{name},{len(offsets)},{len(left_offsets)},{left_right}")
             else:
                 print(f"{frame},{name},{len(offsets)}")
 
-    for name, base in WINDOWS.items():
+    for name, base in windows.items():
         common = set.intersection(*changes[name])
         addresses = (" ".join(f"{base + offset:06X}" for offset in sorted(common))
                      if len(common) <= 64 else "too_many_to_list")

@@ -42,3 +42,5 @@ Counts are differing byte positions at a common callback, not variables, cycles 
 **Verified by execution:** the watchpoint trace did not include a disassembly or prove which code path uses the data. Nothing here identifies an original track segment, camera coordinates, curvature, or a sufficient mapping to the Sega CD five-word camera interface. No physical hardware was used and no renderer code was modified.
 
 **Next experiment — hypothesis:** exclude stack-correlated addresses and search other bounded main/shared RAM pages for fields that respond promptly and directionally to short left/right pulses. Add earlier post-pulse checkpoints, then use watchpoints plus local 68000 code inspection on a small candidate set. Do not change the Sega CD camera interface until a genuine arcade quantity has been identified and shown to exceed its current controls.
+
+**Follow-up — verified by execution:** the [early steering-response experiment](2026-10-20-arcade-early-steering-fields.md) found compact shared-RAM changes by callback 962 and traced three writers to the main CPU. These are control-response candidates, not yet identified camera fields.
