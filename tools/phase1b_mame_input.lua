@@ -7,6 +7,7 @@ local screen = assert(manager.machine.screens[":screen"])
 local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
 local rotate_output = os.getenv("PDRIFT_ROTATE_DIR")
+local swap_output = os.getenv("PDRIFT_SWAP_DIR")
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads")
@@ -43,8 +44,28 @@ if ram_profile == "early" then
                   shared_mid2 = 0x0c8000, shared_high = 0x0cc000 }
 end
 local ram_size = 0x4000
-local rotate_space = rotate_output
+local rotate_space = (rotate_output or swap_output)
   and assert(manager.machine.devices[":suby"].spaces["program"])
+local swap_read_tap
+local swap_write_tap
+local swaps = 0
+local writes_since_swap = 0
+local swap_shadow = {}
+local function swap_bytes(words)
+  local bytes = {}
+  for _, word in ipairs(words) do
+    bytes[#bytes + 1] = string.char((word >> 8) & 0xff, word & 0xff)
+  end
+  return table.concat(bytes)
+end
+local function save_swap_words(kind, words)
+  local path = string.format("%s/swap-%s-%04d-%03d.bin",
+    swap_output, kind, frames, swaps)
+  local file = assert(io.open(path, "wb"))
+  assert(file:write(swap_bytes(words)))
+  assert(file:close())
+  return path
+end
 local rotate_captures = { [961] = true, [962] = true, [965] = true,
                           [970] = true, [980] = true, [1000] = true,
                           [1020] = true }
@@ -88,6 +109,51 @@ emu.register_frame_done(function()
   if steer_pulse and frames == 960 then
     steering:set_value(steer_pulse)
     print(string.format("INPUT,960,steer-%d", steer_pulse))
+  end
+  if swap_output and frames == 955 then
+    for index = 1, 16 do
+      swap_shadow[index] = rotate_space:read_u16(0x1807e0 + 2 * (index - 1))
+    end
+    swap_write_tap = rotate_space:install_write_tap(
+      0x1807e0, 0x1807ff, "pdrift-rotation-parameter-writes",
+      function(offset, data, mask)
+        local index = math.floor((offset - 0x1807e0) / 2) + 1
+        assert(index >= 1 and index <= 16)
+        swap_shadow[index] = (swap_shadow[index] & (~mask & 0xffff))
+          | (data & mask)
+        writes_since_swap = writes_since_swap + 1
+      end)
+    swap_read_tap = rotate_space:install_read_tap(
+      0x198000, 0x198001, "pdrift-rotation-buffer-swap",
+      function()
+        swaps = swaps + 1
+        local pre = save_swap_words("pre", swap_shadow)
+        for index = 1, 16 do
+          swap_shadow[index] = rotate_space:read_u16(0x1807e0 + 2 * (index - 1))
+        end
+        local post = save_swap_words("post", swap_shadow)
+        print(string.format("SWAP,%d,%d,%d,%s,%s", frames, swaps,
+          writes_since_swap, pre, post))
+        writes_since_swap = 0
+      end)
+    print("SWAP_TRACE_ARMED,955")
+  end
+  if swap_output and frames == 1021 then
+    swap_read_tap:remove()
+    swap_write_tap:remove()
+    print(string.format("SWAP_TRACE_CLEARED,1021,%d", swaps))
+  end
+  if swap_output and frames >= 960 and frames <= 970 then
+    local mismatches = 0
+    for index = 1, 16 do
+      if swap_shadow[index] ~= rotate_space:read_u16(0x1807e0 + 2 * (index - 1)) then
+        mismatches = mismatches + 1
+      end
+    end
+    print(string.format("SWAP_SHADOW,%d,%d", frames, mismatches))
+    local path = string.format("%s/swap-screen-%04d.png", swap_output, frames)
+    print(string.format("SWAP_SCREEN,%d,%s,%s", frames, path,
+      tostring(screen:snapshot(path))))
   end
   if debug_mode == "1" and frames == 960 then
     local action = 'printf "WATCH addr=%06X data=%08X pc=%06X sp=%06X\\n",wpaddr,wpdata,pc,a7;g'
