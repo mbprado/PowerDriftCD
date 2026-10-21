@@ -8,6 +8,8 @@ local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
 local geometry_output = os.getenv("PDRIFT_GEOMETRY_SAMPLE_DIR")
 local list_output = os.getenv("PDRIFT_SHARED_LIST_DIR")
+local sequence_end = tonumber(os.getenv("PDRIFT_SEQUENCE_END_FRAME") or "970")
+assert(sequence_end and sequence_end >= 970 and sequence_end <= 1000)
 local rotate_output = os.getenv("PDRIFT_ROTATE_DIR")
 local swap_output = os.getenv("PDRIFT_SWAP_DIR")
 local rotate_override = os.getenv("PDRIFT_ROTATE_OVERRIDE")
@@ -29,7 +31,7 @@ local source_output = os.getenv("PDRIFT_SOURCE_DIR")
 local source_override = os.getenv("PDRIFT_SOURCE_OVERRIDE")
 local source_override_frame = tonumber(os.getenv("PDRIFT_SOURCE_OVERRIDE_FRAME") or "966")
 assert(source_override_frame and source_override_frame >= 960
-  and source_override_frame <= 970)
+  and source_override_frame <= sequence_end)
 local source_override_range = os.getenv("PDRIFT_SOURCE_OVERRIDE_RANGE")
 local extra_screen_frame = tonumber(os.getenv("PDRIFT_EXTRA_SCREEN_FRAME") or "")
 assert(not os.getenv("PDRIFT_EXTRA_SCREEN_FRAME") or extra_screen_frame == 971)
@@ -70,6 +72,11 @@ local ysprite_input_trace = os.getenv("PDRIFT_YSPRITE_INPUT_TRACE") == "1"
 assert(not ysprite_input_trace or debug_mode == "ysprite")
 local ysprite_sequence_trace = os.getenv("PDRIFT_YSPRITE_SEQUENCE_TRACE") == "1"
 assert(not ysprite_sequence_trace or debug_mode == "ysprite")
+local ysprite_sequence_end = tonumber(
+  os.getenv("PDRIFT_YSPRITE_SEQUENCE_END_FRAME") or "971")
+assert(not os.getenv("PDRIFT_YSPRITE_SEQUENCE_END_FRAME") or
+  (ysprite_sequence_trace and ysprite_sequence_end
+    and ysprite_sequence_end >= 971 and ysprite_sequence_end <= 1000))
 local ram_space = (ram_output or debug_mode or geometry_output or list_output)
   and assert(manager.machine.devices[":maincpu"].spaces["program"])
 local geometry_file
@@ -214,6 +221,11 @@ print("RAM_PROFILE=" .. ram_profile)
 emu.register_frame_done(function()
   if not state_ready then return end
   frames = frames + 1
+  if ysprite_sequence_trace and frames >= 960 and
+      frames <= ysprite_sequence_end then
+    manager.machine.debugger:command(
+      string.format('printf "SEQUENCE_FRAME,%d\\n"', frames))
+  end
   if frames == 60 then coin:set_value(1); print("INPUT,60,coin-on") end
   if frames == 65 then coin:set_value(0); print("INPUT,65,coin-off") end
   if frames == 130 then start:set_value(1); print("INPUT,130,start-on") end
@@ -286,7 +298,7 @@ emu.register_frame_done(function()
     print(string.format("SWAP_TRACE_CLEARED,1021,%d", swaps))
   end
   if swap_output and frames >= 960 and
-      (frames <= 970 or frames == extra_screen_frame) then
+      (frames <= sequence_end or frames == extra_screen_frame) then
     local mismatches = 0
     for index = 1, 16 do
       if swap_shadow[index] ~= rotate_space:read_u16(0x1807e0 + 2 * (index - 1)) then
@@ -298,7 +310,7 @@ emu.register_frame_done(function()
     print(string.format("SWAP_SCREEN,%d,%s,%s", frames, path,
       tostring(screen:snapshot(path))))
   end
-  if geometry_file and frames >= 960 and frames <= 970 then
+  if geometry_file and frames >= 960 and frames <= sequence_end then
     local table_base = (ram_space:read_u16(0x0ceb00) << 16)
       | ram_space:read_u16(0x0ceb02)
     local globals = {}
@@ -336,9 +348,9 @@ emu.register_frame_done(function()
         table.unpack(values))))
     end
     print(string.format("GEOMETRY_SAMPLES,%d,12,%06X", frames, table_base))
-    if frames == 970 then assert(geometry_file:close()) end
+    if frames == sequence_end then assert(geometry_file:close()) end
   end
-  if list_output and frames >= 960 and frames <= 970 then
+  if list_output and frames >= 960 and frames <= sequence_end then
     capture_shared_list(frames)
   end
   if debug_mode == "1" and frames == 960 then
@@ -535,7 +547,7 @@ emu.register_frame_done(function()
     end
   end
   if debug_mode == "ysprite" and frames ==
-      (ysprite_sequence_trace and 971 or 967) then
+      (ysprite_sequence_trace and ysprite_sequence_end or 967) then
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     local debugger = manager.machine.devices[":subx"].debug
     for _, index in ipairs(input_breakpoints) do debugger:bpclear(index) end
@@ -558,7 +570,7 @@ emu.register_frame_done(function()
   if rotate_output and rotate_captures[frames] then
     capture_rotate(frames)
   end
-  if source_output and frames >= 960 and frames <= 970 then
+  if source_output and frames >= 960 and frames <= sequence_end then
     capture_source(frames, "ysprites", source_x_space, 0x180000, 0x10000)
     capture_source(frames, "bsprites", source_y_space, 0x188000, 0x1000)
     capture_source(frames, "palette", source_y_space, 0x190000, 0x4000)
