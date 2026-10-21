@@ -1,0 +1,37 @@
+# Phase 1B: shared projection sequence and depth rejection — 2026-10-21
+
+**Question / hypothesis:** can the already identified shared transform and ROM coefficient lookups explain a longer sequence of projected road records under three steering inputs? **Baseline:** the callback-950 owner-local state, the 960–1000 scalar captures, and the earlier five-step fixed-point replay. **Acceptance:** predict 20 consecutive two-callback updates for 12 depths in each steering condition; check the branch that rejects records against actual main-CPU execution, including output writes; preserve the Sega CD renderer. **Result — PASS for this bounded projection, verified by execution in MAME:** the replay matched **720/720 X/Y pairs**. A debugger trace observed **649 output writes and 71 depth-check skips**. This is a sequence of *projection inputs and outputs*, not a decoded physical camera trajectory or independently recovered track segment.
+
+## Environment and reproduction
+
+**Verified by execution:** starting Git revision `86328efd08234e88373e92c3bbba3e1118057681` on `experiment/perspective-road`; macOS 26.6.2 x86_64; isolated MAME 0.289 source revision `f34f02505e32c1993c6a782b6814232cbfc74e36`, executable SHA-256 `86cedb4f1a0f85ace895fa533a33c5e6eedb3fbd4f272ad85aa85410174d1d3d`, using the existing [capture-only bitmap patch](../../tools/phase1b_mame_ybitmap.patch). Owner-local 53-file ROM manifest SHA-256 `b8894130f0d4081fb193fe675acd45f7ded2e0f3572a0d23560e9ebb969c6f2f`; private callback-950 state SHA-256 `700b12cf2a60cdb44448877a07ae24395dc77a35b89d69fb2df6a60d27422b6a`. The selected ROMs, state, scalar captures and debugger logs remain ignored under `build/private/`. No upstream emulator code was edited.
+
+**Verified by execution:** the input schedule holds the pedal, keeps steering at 128 for center, or pulses to 64/192 from callback 960 for left/right. The existing `build/private/phase1b-depth-sequence-{center,left,right}/geometry-samples.csv` contains 41 callback snapshots × 12 selected records per condition. Its SHA-256 values are recorded in the [depth-sequence report](2026-10-21-arcade-depth-sequence-limit.md). A new optional `PDRIFT_DEBUG_WATCH=projection` mode in `tools/phase1b_mame_input.lua` logs the first-rotation gate, later depth check and coordinate write for those 12 records, with callback markers; it does not alter emulated RAM or CPU registers. Probe SHA-256: `7e728041bc2020ad247221840fed1d1f2e6cefbaf83997dd7288f15e96c582be`. The analysis script SHA-256 is `eaf9d790b0f1446c156f5f2ac4fca13f70af3ed3260c5035f859419dc2701035`.
+
+Reproduce each trace in a fresh ignored directory using the local, owner-provided ROM path and state. Set `PDRIFT_STEER_PULSE=64` or `192` for the steered runs; omit it for center:
+
+```sh
+SDL_VIDEODRIVER=dummy PDRIFT_SNAPSHOT_DIR=. PDRIFT_SEQUENCE_END_FRAME=1000 PDRIFT_STATE_LOAD=/absolute/private/callback950.sta PDRIFT_DEBUG_WATCH=projection /private/tmp/pd-mame0289-source/mame pdrift -rompath /absolute/private/rompath -noreadconfig -video none -sound none -nothrottle -seconds_to_run 18 -debug -debugger none -debuglog -autoboot_script /Users/murilo/repos/PowerDriftCD/tools/phase1b_mame_input.lua
+python3 tools/phase1b_camera_sequence.py build/private
+```
+
+Place the trace `debug.log` for each run under `build/private/phase1b-projection-depth-{center,left,right}/`. The command above assumes the previously captured geometry CSVs are present. Raw trace SHA-256 (center/left/right): `85c575dc10d92e3e5ecedf5248eb6448291af63c6e2b8fc8e71cf95a2e783614`, `9f3fe827593a844946ff2b1d43819d46396eae33aab654d50dcbd890b418e8c3`, `6b1db1e8c427f35abb7054b2dfb86e6fb4097868d21111579def5e894aecbe94`. The probe's callback-1020 screenshot matched the earlier capture byte-for-byte in each condition, a check that this trace did not visibly perturb the replay.
+
+## What the trace establishes
+
+**Verified by execution:** within each callback, all 12 records share the same sampled transform fields and lookup coefficients. The 41 snapshots yield 21 distinct sampled parameter packets per steering condition. Across center/left/right, the selected ROM geometry and active source-coordinate triples match at each callback and depth. The fields that vary under steering in this window are the horizontal projection offset, three translation-like words, one coefficient lookup index and its sine/cosine pair. The other sampled angle-like index and coefficient pair remain fixed. These are address/operation descriptions; their physical axes, units and camera meaning are **unsupported**.
+
+**Verified by execution:** the projection pass between even callback `f` and `f+2` uses most inputs sampled at `f`, but the horizontal offset sampled at `f+2`; the [earlier execution-time trace](2026-10-21-arcade-geometry-projection-sequence.md) checked that offset alignment directly. The new replay reproduces the signed 16-/32-bit rotations, depth test, division and output shifts. It compares X *and* Y at `f+2` against the captured output, for all 20 updates and 12 depths per condition. The counts are:
+
+| Steering | Exact X/Y pairs | Coordinate writes | Depth-check skips | First-rotation gate entries |
+| --- | ---: | ---: | ---: | ---: |
+| Center | 240/240 | 216 | 24 | 24 |
+| Left | 240/240 | 217 | 23 | 23 |
+| Right | 240/240 | 216 | 24 | 24 |
+| **Total** | **720/720** | **649** | **71** | **71** |
+
+**Verified by execution:** the initial static reading of `$033D84–$033D94` suggested that a first-rotation accumulator at or below `-$10000` might reject near records. The direct `$033D8E` trace disproved that explanation here: on all 71 entries, the gate word at `$0CEA42` was `$0080`, so that branch continued. At `$033E00`, the later transformed-depth word was nonpositive for exactly those 71 records; the routine did not reach the `$033E58` coordinate write for them. The replay retains their previous X/Y words, matching the captured output. All 649 positive-depth cases reached the coordinate write. In this bounded window the two conditions happen to select the same records, but the **depth check is the observed reason for the skips**. A future input state with a different gate word could behave differently.
+
+**Verified by execution:** `python3 tools/phase1b_projection_replay.py build/private` still passes its previous five-update, 180-pair regression. The new tool checks every debugger gate/depth/write event as well as every output pair; it fails on unexpected events or a changed branch outcome. It does not fit parameters from screen coordinates. The `$3A00` far-depth sample remains separately linked to intermittent visible screen contribution in the [visibility report](2026-10-21-arcade-far-depth-visibility.md), but the 720-pair result is a main-CPU coordinate result, **not** 720 independently visible road pixels.
+
+**Unsupported:** a decoded world-space camera position/orientation, original track curvature/elevation units, a complete visible road edge, or a proven mapping into the Sega CD five-word camera command. These traces measure no Sega CD frame cost or physical arcade hardware timing. No second arcade emulator, Sega CD engine change or physical-hardware test was performed. **Hypothesis for the next bounded experiment:** identify the producer of the shared transform packet and check whether its changing fields correspond to steering, road geometry or both; only then test which of those observed degrees of freedom can be represented by the existing Sega CD camera interface.

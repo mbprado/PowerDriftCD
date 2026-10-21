@@ -53,7 +53,8 @@ if source_override_range then
 end
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
-  or debug_mode == "reads" or debug_mode == "ysprite")
+  or debug_mode == "reads" or debug_mode == "ysprite"
+  or debug_mode == "projection")
 local shared_watch_address = os.getenv("PDRIFT_SHARED_WATCH_ADDR")
   and tonumber(os.getenv("PDRIFT_SHARED_WATCH_ADDR"), 16)
 local shared_watch_until = tonumber(os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or "")
@@ -110,6 +111,7 @@ local frames = 0
 local state_ready = not state_load
 local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
+  or debug_mode == "projection"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
 local input_breakpoints = {}
@@ -227,8 +229,8 @@ print("RAM_PROFILE=" .. ram_profile)
 emu.register_frame_done(function()
   if not state_ready then return end
   frames = frames + 1
-  if ysprite_sequence_trace and frames >= 960 and
-      frames <= ysprite_sequence_end then
+  if (ysprite_sequence_trace or debug_mode == "projection") and frames >= 960 and
+      frames <= (debug_mode == "projection" and sequence_end or ysprite_sequence_end) then
     manager.machine.debugger:command(
       string.format('printf "SEQUENCE_FRAME,%d\\n"', frames))
   end
@@ -475,6 +477,23 @@ emu.register_frame_done(function()
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print(string.format("WATCH_CLEARED,%d", frames))
+  end
+  if debug_mode == "projection" and frames == 960 then
+    manager.machine.debugger.visible_cpu = manager.machine.devices[":maincpu"]
+    local action = 'printf "PROJECTION_GATE pc=%06X a5=%06X d4=%08X flag=%04X old=%08X\\n",pc,a5,d4,w@cea42,d@(a5+4);g'
+    main_record_breakpoints[1] = cpu_debug:bpset(0x33d8e,
+      "a5>=c1c80&&a5<=c1f40&&((a5-c1c80)&3f)==0", action)
+    main_record_breakpoints[2] = cpu_debug:bpset(0x33e00,
+      "a5>=c1c80&&a5<=c1f40&&((a5-c1c80)&3f)==0",
+      'printf "PROJECTION_DEPTH pc=%06X a5=%06X d2=%08X old=%08X\\n",pc,a5,d2,d@(a5+4);g')
+    main_record_breakpoints[3] = cpu_debug:bpset(0x33e58,
+      "a5>=c1c80&&a5<=c1f40&&((a5-c1c80)&3f)==0",
+      'printf "PROJECTION_WRITE pc=%06X a5=%06X d0=%08X\\n",pc,a5,d0;g')
+    print("PROJECTION_GATE_ARMED,33D8E,33E00,33E58,0C1C80_TO_0C1F40")
+  end
+  if debug_mode == "projection" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print(string.format("PROJECTION_GATE_CLEARED,%d", frames))
   end
   if debug_mode == "reads" and frames == 960 then
     local read_cpu = os.getenv("PDRIFT_READ_CPU")
