@@ -72,6 +72,12 @@ local ysprite_input_trace = os.getenv("PDRIFT_YSPRITE_INPUT_TRACE") == "1"
 assert(not ysprite_input_trace or debug_mode == "ysprite")
 local ysprite_sequence_trace = os.getenv("PDRIFT_YSPRITE_SEQUENCE_TRACE") == "1"
 assert(not ysprite_sequence_trace or debug_mode == "ysprite")
+local ysprite_sequence_last_kind = tonumber(
+  os.getenv("PDRIFT_YSPRITE_SEQUENCE_LAST_KIND") or "20", 16)
+assert(ysprite_sequence_last_kind and ysprite_sequence_last_kind >= 0x20
+  and ysprite_sequence_last_kind <= 0x27)
+assert(not os.getenv("PDRIFT_YSPRITE_SEQUENCE_LAST_KIND") or
+  ysprite_sequence_trace)
 local ysprite_sequence_end = tonumber(
   os.getenv("PDRIFT_YSPRITE_SEQUENCE_END_FRAME") or "971")
 assert(not os.getenv("PDRIFT_YSPRITE_SEQUENCE_END_FRAME") or
@@ -542,8 +548,11 @@ emu.register_frame_done(function()
     if ysprite_sequence_trace then
       local action = 'printf "SUBX_LIST pc=%06X first=%08X pos=%08X size=%08X source=%08X a0=%06X a2=%06X\\n",pc,d0,d1,d2,d3,a0,a2;g'
       input_breakpoints[#input_breakpoints + 1] =
-        debugger:bpset(0xdd6a, "(d0&ffff)==20", action)
-      print("SEQUENCE_TRACE_ARMED,DD6A,LOW_WORD_0020")
+        debugger:bpset(0xdd6a,
+          string.format("(d0&ffff)>=20&&(d0&ffff)<=%X",
+            ysprite_sequence_last_kind), action)
+      print(string.format("SEQUENCE_TRACE_ARMED,DD6A,LOW_WORD_0020_TO_%04X",
+        ysprite_sequence_last_kind))
     end
   end
   if debug_mode == "ysprite" and frames ==
