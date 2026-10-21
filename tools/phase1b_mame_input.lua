@@ -7,6 +7,7 @@ local screen = assert(manager.machine.screens[":screen"])
 local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
 local geometry_output = os.getenv("PDRIFT_GEOMETRY_SAMPLE_DIR")
+local list_output = os.getenv("PDRIFT_SHARED_LIST_DIR")
 local rotate_output = os.getenv("PDRIFT_ROTATE_DIR")
 local swap_output = os.getenv("PDRIFT_SWAP_DIR")
 local rotate_override = os.getenv("PDRIFT_ROTATE_OVERRIDE")
@@ -26,7 +27,12 @@ if rotate_override then
 end
 local source_output = os.getenv("PDRIFT_SOURCE_DIR")
 local source_override = os.getenv("PDRIFT_SOURCE_OVERRIDE")
+local source_override_frame = tonumber(os.getenv("PDRIFT_SOURCE_OVERRIDE_FRAME") or "966")
+assert(source_override_frame and source_override_frame >= 960
+  and source_override_frame <= 970)
 local source_override_range = os.getenv("PDRIFT_SOURCE_OVERRIDE_RANGE")
+local extra_screen_frame = tonumber(os.getenv("PDRIFT_EXTRA_SCREEN_FRAME") or "")
+assert(not os.getenv("PDRIFT_EXTRA_SCREEN_FRAME") or extra_screen_frame == 971)
 local state_save = os.getenv("PDRIFT_STATE_SAVE")
 local state_load = os.getenv("PDRIFT_STATE_LOAD")
 assert(not state_save or not state_load)
@@ -62,7 +68,9 @@ assert(ysprite_watch_offset and ysprite_watch_offset % 16 == 0
   and ysprite_watch_offset >= 0 and ysprite_watch_offset <= 0xfff0)
 local ysprite_input_trace = os.getenv("PDRIFT_YSPRITE_INPUT_TRACE") == "1"
 assert(not ysprite_input_trace or debug_mode == "ysprite")
-local ram_space = (ram_output or debug_mode or geometry_output)
+local ysprite_sequence_trace = os.getenv("PDRIFT_YSPRITE_SEQUENCE_TRACE") == "1"
+assert(not ysprite_sequence_trace or debug_mode == "ysprite")
+local ram_space = (ram_output or debug_mode or geometry_output or list_output)
   and assert(manager.machine.devices[":maincpu"].spaces["program"])
 local geometry_file
 if geometry_output then
@@ -160,6 +168,17 @@ local function capture_ram(frame, name, address)
   assert(file:write(table.concat(bytes)))
   assert(file:close())
   print(string.format("RAM,%d,%s,%06X,%d,%s", frame, name, address, ram_size, path))
+end
+local function capture_shared_list(frame)
+  local bytes = {}
+  for offset = 0, 0x1fff do
+    bytes[#bytes + 1] = string.char(ram_space:read_u8(0x0c9800 + offset))
+  end
+  local path = string.format("%s/shared-list-%04d.bin", list_output, frame)
+  local file = assert(io.open(path, "wb"))
+  assert(file:write(table.concat(bytes)))
+  assert(file:close())
+  print(string.format("SHARED_LIST,%d,0C9800,8192,%s", frame, path))
 end
 local function capture_rotate(frame)
   local bytes = {}
@@ -266,7 +285,8 @@ emu.register_frame_done(function()
     swap_write_tap:remove()
     print(string.format("SWAP_TRACE_CLEARED,1021,%d", swaps))
   end
-  if swap_output and frames >= 960 and frames <= 970 then
+  if swap_output and frames >= 960 and
+      (frames <= 970 or frames == extra_screen_frame) then
     local mismatches = 0
     for index = 1, 16 do
       if swap_shadow[index] ~= rotate_space:read_u16(0x1807e0 + 2 * (index - 1)) then
@@ -317,6 +337,9 @@ emu.register_frame_done(function()
     end
     print(string.format("GEOMETRY_SAMPLES,%d,12,%06X", frames, table_base))
     if frames == 970 then assert(geometry_file:close()) end
+  end
+  if list_output and frames >= 960 and frames <= 970 then
+    capture_shared_list(frames)
   end
   if debug_mode == "1" and frames == 960 then
     local action = 'printf "WATCH addr=%06X data=%08X pc=%06X sp=%06X\\n",wpaddr,wpdata,pc,a7;g'
@@ -504,12 +527,19 @@ emu.register_frame_done(function()
       input_breakpoints[2] = debugger:bpset(0xdd6a, "a2==18c630", after)
       print("INPUT_TRACE_ARMED,DD64,DD6A,18C630")
     end
+    if ysprite_sequence_trace then
+      local action = 'printf "SUBX_LIST pc=%06X first=%08X pos=%08X size=%08X source=%08X a0=%06X a2=%06X\\n",pc,d0,d1,d2,d3,a0,a2;g'
+      input_breakpoints[#input_breakpoints + 1] =
+        debugger:bpset(0xdd6a, "(d0&ffff)==20", action)
+      print("SEQUENCE_TRACE_ARMED,DD6A,LOW_WORD_0020")
+    end
   end
-  if debug_mode == "ysprite" and frames == 967 then
+  if debug_mode == "ysprite" and frames ==
+      (ysprite_sequence_trace and 971 or 967) then
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     local debugger = manager.machine.devices[":subx"].debug
     for _, index in ipairs(input_breakpoints) do debugger:bpclear(index) end
-    print("WATCH_CLEARED,ysprite,967")
+    print(string.format("WATCH_CLEARED,ysprite,%d", frames))
   end
   if steer_pulse and frames == steer_return then
     steering:set_value(128)
@@ -533,7 +563,7 @@ emu.register_frame_done(function()
     capture_source(frames, "bsprites", source_y_space, 0x188000, 0x1000)
     capture_source(frames, "palette", source_y_space, 0x190000, 0x4000)
   end
-  if source_override and frames == 966 then
+  if source_override and frames == source_override_frame then
     local file = assert(io.open(source_override, "rb"))
     local bytes = assert(file:read("*a"))
     assert(file:close())
@@ -541,8 +571,8 @@ emu.register_frame_done(function()
     for offset = override_start, override_start + override_size - 1 do
       source_x_space:write_u8(0x180000 + offset, bytes:byte(offset + 1))
     end
-    print(string.format("SOURCE_OVERRIDE,966,ysprites,%04X,%04X,%s",
-      override_start, override_size, source_override))
+    print(string.format("SOURCE_OVERRIDE,%d,ysprites,%04X,%04X,%s",
+      frames, override_start, override_size, source_override))
     capture_source(frames, "ysprites-after", source_x_space, 0x180000, 0x10000)
   end
   if state_save and frames == 950 then
