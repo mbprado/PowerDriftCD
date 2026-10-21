@@ -1,0 +1,52 @@
+diff --git a/scripts/src/cpu.lua b/scripts/src/cpu.lua
+index 02acb053..b3768c3e 100644
+--- a/scripts/src/cpu.lua
++++ b/scripts/src/cpu.lua
+@@ -14,6 +14,7 @@
+ --------------------------------------------------
+ 
+ DRC_CPUS = { "ADSP21062", "DSP16", "DSPP", "E1", "MB86235", "MIPS3", "POWERPC", "SH", "SWP30", "UNSP" }
++CPUS["M680X0"] = true -- Power Drift isolated one-driver build uses Musashi 68000.
+ CPU_INCLUDE_DRC = false
+ for i, v in ipairs(DRC_CPUS) do
+ 	if (CPUS[v]~=null) then
+diff --git a/src/mame/sega/segaybd.cpp b/src/mame/sega/segaybd.cpp
+index 825ea773..a7ced6e5 100644
+--- a/src/mame/sega/segaybd.cpp
++++ b/src/mame/sega/segaybd.cpp
+@@ -218,6 +218,9 @@ EPR-12028 - 27C256 EPROM
+ 
+ #include "pdrift.lh"
+ 
++#include <cstdio>
++#include <cstdlib>
++
+ 
+ //**************************************************************************
+ //  CONSTANTS
+@@ -476,6 +479,25 @@ uint32_t segaybd_state::screen_update(screen_device &screen, bitmap_ind16 &bitma
+ 	rectangle yboard_clip(0, 511, 0, 511);
+ 	m_ysprites->bitmap().fill(0xffff);
+ 	m_ysprites->draw_async(yboard_clip);
++	if (char const *const capture_dir = std::getenv("PDRIFT_YBITMAP_DIR"))
++	{
++		uint64_t const frame = screen.frame_number();
++		if (frame >= 960 && frame <= 970)
++		{
++			char path[1024];
++			std::snprintf(path, sizeof(path), "%s/ybitmap-%04llu.raw",
++				capture_dir, static_cast<unsigned long long>(frame));
++			std::FILE *const out = std::fopen(path, "wb");
++			if (!out)
++				fatalerror("Cannot open Y-bitmap capture: %s", path);
++			bitmap_ind16 const &source = m_ysprites->bitmap();
++			for (int y = 0; y < 512; ++y)
++				if (std::fwrite(&source.pix(y), sizeof(uint16_t), 512, out) != 512)
++					fatalerror("Cannot write Y-bitmap capture: %s", path);
++			if (std::fclose(out))
++				fatalerror("Cannot close Y-bitmap capture: %s", path);
++		}
++	}
+ 
+ 	m_bsprites->draw_async(cliprect);
+ 
