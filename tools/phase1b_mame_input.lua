@@ -82,6 +82,12 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
 local input_breakpoints = {}
+local main_record_breakpoints = {}
+local geometry_override_word = os.getenv("PDRIFT_GEOMETRY_OVERRIDE_WORD")
+  and tonumber(os.getenv("PDRIFT_GEOMETRY_OVERRIDE_WORD"), 16)
+assert(not os.getenv("PDRIFT_GEOMETRY_OVERRIDE_WORD") or
+  (debug_mode == "shared" and geometry_override_word
+    and geometry_override_word >= 0 and geometry_override_word <= 0xffff))
 if debug_watch then
   assert(manager.machine.debugger)
   manager.machine.debugger.execution_state = "run"
@@ -272,7 +278,8 @@ emu.register_frame_done(function()
     for _, index in ipairs(watchpoints) do cpu_debug:wpclear(index) end
     print("WATCH_CLEARED,1020")
   end
-  if debug_mode == "shared" and frames == 960 then
+  if debug_mode == "shared" and frames ==
+      (os.getenv("PDRIFT_SHARED_WATCH_FROM_BOOT") == "1" and 1 or 960) then
     local disasm_dir = os.getenv("PDRIFT_DISASM_DIR")
     if disasm_dir then
       manager.machine.debugger.visible_cpu = manager.machine.devices[":maincpu"]
@@ -292,6 +299,27 @@ emu.register_frame_done(function()
         manager.machine.debugger:command(
           string.format("dasm %s,33D00,100,0,:maincpu", transform_path))
         print("DISASM," .. transform_path)
+        if os.getenv("PDRIFT_MAIN_RECORD_TRACE") == "1" then
+          local caller_path = disasm_dir .. "/main-sprite-caller.asm"
+          manager.machine.debugger:command(
+            string.format("dasm %s,33A00,400,0,:maincpu", caller_path))
+          print("DISASM," .. caller_path)
+        end
+      end
+      if os.getenv("PDRIFT_GLOBAL_DISASM") == "1" then
+        for _, item in ipairs({ { "main-global-angle", 0x338f0 },
+                                 { "main-global-position", 0x347c0 } }) do
+          local path = disasm_dir .. "/" .. item[1] .. ".asm"
+          manager.machine.debugger:command(
+            string.format("dasm %s,%X,200,0,:maincpu", path, item[2]))
+          print("DISASM," .. path)
+        end
+      end
+      if os.getenv("PDRIFT_GEOMETRY_DISASM") == "1" then
+        local path = disasm_dir .. "/main-geometry-table-select.asm"
+        manager.machine.debugger:command(
+          string.format("dasm %s,385E0,200,0,:maincpu", path))
+        print("DISASM," .. path)
       end
     end
     for _, tag in ipairs({ "maincpu", "subx", "suby" }) do
@@ -312,10 +340,49 @@ emu.register_frame_done(function()
       end
     end
     print("WATCH_ARMED,shared," .. tostring(#watchpoints))
+    if os.getenv("PDRIFT_MAIN_RECORD_TRACE") == "1" then
+      local action = 'printf "MAIN_RECORD pc=%06X a0=%06X a1=%06X a2=%06X a3=%06X a4=%06X a5=%06X a6=%06X d0=%08X d1=%08X d2=%08X d6=%08X\\n",pc,a0,a1,a2,a3,a4,a5,a6,d0,d1,d2,d6'
+      local fields = 'printf "MAIN_FIELDS pc=%06X first=%08X pos=%08X obj=%08X p16=%04X p18=%04X p1a=%04X p1c=%04X p1e=%04X p20=%04X flag32=%04X flag36=%04X depth=%04X cam16=%04X cam18=%04X cam1a=%04X cam1c=%04X cam1e=%04X cam20=%04X\\n",pc,d@a5,d@(a5+4),d@(a5+8),w@(a5+16),w@(a5+18),w@(a5+1a),w@(a5+1c),w@(a5+1e),w@(a5+20),w@(a5+32),w@(a5+36),w@(a5+3e),w@(a4+16),w@(a4+18),w@(a4+1a),w@(a4+1c),w@(a4+1e),w@(a4+20)'
+      for _, pc in ipairs({ 0x33d1e, 0x33d56, 0x33e58, 0x33e84 }) do
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(pc, "a5==c1c80",
+            action .. (pc == 0x33d1e and ";" .. fields or "") .. ";g")
+      end
+      print("MAIN_RECORD_TRACE_ARMED,33D1E,33D56,33E58,33E84")
+    end
+    if os.getenv("PDRIFT_MAIN_OBJECT_LIST") == "1" then
+      local action = 'printf "OBJECT_ENTRY pc=%06X a0=%06X a5=%06X first=%08X pos=%08X p16=%04X p18=%04X p1a=%04X depth=%04X\\n",pc,a0,a5,d@a5,d@(a5+4),w@(a5+16),w@(a5+18),w@(a5+1a),w@(a5+3e);g'
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33d1e, "a0==c9800", action)
+      print("MAIN_OBJECT_LIST_ARMED,33D1E,0C9800")
+    end
+    if os.getenv("PDRIFT_MAIN_GEOMETRY_TRACE") == "1" then
+      local action = 'printf "GEOMETRY_ENTRY pc=%06X a5=%06X a3=%06X table=%06X depth=%04X d0=%08X d1=%08X sample0=%04X sample1=%04X sample2=%04X\\n",pc,a5,a3,d@ceb00,w@(a5+3e),d0,d1,w@a3,w@(a3+2),w@(a3+4);g'
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33b22, "a5==c1c80", action)
+      print("MAIN_GEOMETRY_TRACE_ARMED,33B22,0C1C80")
+    end
+    if geometry_override_word then
+      local original = ram_space:read_u16(0x0c1c96)
+      local condition = "a5==c1c80&&a0==c9800"
+      local entry = string.format(
+        'printf "GEOMETRY_OVERRIDE pc=%%06X old=%%04X new=%04X\\n",pc,w@(a5+16);w@(a5+16)=%04X;g',
+        geometry_override_word, geometry_override_word)
+      local exit_action = string.format(
+        'printf "GEOMETRY_RESTORE pc=%%06X value=%04X\\n",pc;w@(a5+16)=%04X;g',
+        original, original)
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33d1e, condition, entry)
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33e84, condition, exit_action)
+      print(string.format("GEOMETRY_OVERRIDE_ARMED,%04X,%04X",
+        original, geometry_override_word))
+    end
   end
   if debug_mode == "shared" and frames ==
       (shared_watch_address and 967 or 965) then
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print(string.format("WATCH_CLEARED,%d", frames))
   end
   if debug_mode == "reads" and frames == 960 then
