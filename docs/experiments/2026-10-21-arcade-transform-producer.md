@@ -1,0 +1,46 @@
+# Phase 1B: producer of the shared arcade projection parameters — 2026-10-21
+
+**Question / hypothesis:** which code produces the shared parameter packet used by the verified [720-pair projection replay](2026-10-21-arcade-global-projection-sequence.md), and which changes can be separated from progress through the arcade's depth-indexed lookup? **Baseline:** the same owner-local callback-950 MAME state, center/left/right steering schedules and private 960–1000 scalar captures. **Acceptance:** observe writes to the complete sampled transform range on all three arcade CPUs, identify the producer and write order, compare source operands and writes with the next snapshot, and mark where steering runs cease to have the same lookup position. **Result — PASS for this bounded producer chain, verified by execution in MAME:** the main CPU made **383 accounted write events** in 60 ordered producer passes; all **360 final field values** matched subsequent snapshots. The trace exposes a same-update sequencing detail and a later extra translation adjustment. It does not identify a physical camera coordinate system or a Sega CD control mapping.
+
+## Environment and method
+
+**Verified by execution:** starting project revision `1242d5bd4e972a132840f8c042b736a4a198b394` on `experiment/perspective-road`; macOS 26.6.2 x86_64; isolated MAME 0.289 source revision `f34f02505e32c1993c6a782b6814232cbfc74e36`, executable SHA-256 `86cedb4f1a0f85ace895fa533a33c5e6eedb3fbd4f272ad85aa85410174d1d3d`, with the existing [capture-only patch](../../tools/phase1b_mame_ybitmap.patch). Owner-local 53-file ROM manifest SHA-256 `b8894130f0d4081fb193fe675acd45f7ded2e0f3572a0d23560e9ebb969c6f2f`; private callback-950 state SHA-256 `700b12cf2a60cdb44448877a07ae24395dc77a35b89d69fb2df6a60d27422b6a`. No upstream emulator code, console renderer, ROM or proprietary extract was tracked or changed.
+
+**Verified by execution:** an optional `PDRIFT_DEBUG_WATCH=transform` mode in `tools/phase1b_mame_input.lua` watches `$0C0096–$0C00A7` on main CPU, sub-CPU X and sub-CPU Y from callback 960 to 1000. Optional `PDRIFT_TRANSFORM_SOURCE_TRACE=1` records the selected source operands and the first object's projection entry. The trace mode only reads debugger state. Three saved-state replays used held pedal and center steering 128 or a pulse to 64/192 from callback 960. All three callback-1020 screenshots matched their prior uninstrumented captures byte-for-byte; SHA-256 (center/left/right) was `6cb8abb22383987ead0bf0e4a7f8c6daed4d90831550230feec52f90bfc055be`, `8fc4d9c76b4718831724fce080e495d06098ec347f1cbbcbda234b27333a6733`, `a10afa71a289ed3c8695019726b4286e278a0e593205fa0451afd3562b3ca7ee`. Lua probe SHA-256: `1cdc122e96c2acaaaf4753b7836488c88545694effcb1912e501123d2e6b6afa`. Analyzer SHA-256: `18a8f8360dd7716dcd1ac0bed22e8d3661d989a8d9321d773c0fc2d731ad5d0c`.
+
+Reproduce in separate ignored working directories. Use `PDRIFT_STEER_PULSE=64` or `192` for left/right; omit it for center. The earlier geometry CSVs must be present in `build/private/phase1b-depth-sequence-{center,left,right}/`:
+
+```sh
+SDL_VIDEODRIVER=dummy PDRIFT_SNAPSHOT_DIR=. PDRIFT_SEQUENCE_END_FRAME=1000 PDRIFT_STATE_LOAD=/absolute/private/callback950.sta PDRIFT_DEBUG_WATCH=transform PDRIFT_TRANSFORM_SOURCE_TRACE=1 /private/tmp/pd-mame0289-source/mame pdrift -rompath /absolute/private/rompath -noreadconfig -video none -sound none -nothrottle -seconds_to_run 18 -debug -debugger none -debuglog -autoboot_script /Users/murilo/repos/PowerDriftCD/tools/phase1b_mame_input.lua
+python3 tools/phase1b_transform_producer.py build/private
+```
+
+Save each `debug.log` under `build/private/phase1b-transform-source-{center,left,right}/`. Its SHA-256 is respectively `e452628b24665ae1d08208440c7af7bef8d84c4ced6ed38931aaba9093cbacb0`, `b3c0ff9502011ecbaf83a07df56f23ffa4eacc2cccbcd89c705f36d90f1ef3b3`, `aaf6ed8982eb1b8e20759a170a6498a9a3b65a6bdebab2040785b4153271c1bf`. A separate read-only disassembly capture with `PDRIFT_DISASM_DIR=.` is in ignored `build/private/phase1b-transform-disasm-left/`; its angle, offset and position file hashes are `796c8d4600fa46cfcf7b53024593362b20055a5da6a9c1bc94dd123aa58eae04`, `0eeab69cfa1d8a541ec7207552c2c79d2edea1195a595a2aae502b438e32ea02`, `f7f2b6d09222b1636a196d4dc1b7f4f98eb750ec5116e19ab10741f7c0cf6ad7`. Those private files contain original-code disassembly and are not committed.
+
+## Write order and provenance
+
+**Verified by execution:** all watched writes in the selected window came from the main CPU; the two sub-CPU watchpoints observed none. For each of 20 update intervals per steering condition, the main CPU first copied a source word at shared `$0C00AE` into horizontal projection offset `$0C0098`. The first selected object's `$033D1E` projection entry then read that **new offset** with the **previous** angle indexes and translations. Only after that projection entry did the main CPU write the next angle indexes `$0C00A6/$0C00A4`, followed by negated source-position words into `$0C009E/$0C009C/$0C00A0`. This directly explains why the [projection replay](2026-10-21-arcade-global-projection-sequence.md) needs the later offset but the earlier other parameters. All 60 ordered traces matched that relation and the corresponding before/after scalar snapshots.
+
+**Verified by execution:** bounded local disassembly and debugger operands at `$034680–$034706` show the first angle-like index is built from a depth-indexed table value plus half of a signed state adjustment, then masked to ten bits. The second is built from a smoothed state word and fixed adjustment, also masked to ten bits. The 60 observed first-index values and second-index values matched those operations and their subsequent writes. At `$03483C–$03485E`, the main CPU negates three state-position words into the translation fields; all 180 base translation writes matched that relation. These operational descriptions do not assign world-space axes or units.
+
+**Verified by execution:** left steering caused 14 later writes to `$0C00A0` at `$0348D0`, and right steering caused nine; center caused none in these 20 updates. Each later value, rather than the earlier base value, matched the next captured translation. Local disassembly at `$034894–$0348CC` shows this later path is conditional and uses a state counter, table lookup and arithmetic. Calling it a bank, bounce or elevation correction is **unsupported** without isolating its input. The analyzer explicitly accepts either 10-event base passes or 11-event passes with only this extra write: center 120 base/0 extra, left 120/14, right 120/9, **383 accounted events and 360/360 final fields**.
+
+## Steering and lookup position
+
+**Verified by execution:** with the same state at callback 950, position source words already differed between center and each steered run at the first traced update marker, 961. The projection offset first differed at 963, and the signed adjustment feeding the first angle index at 965. The first-index result differed at marker 967 for left and 965 for right. Thus the sampled producer packet responds to steering before the depth-indexed lookup position differs.
+
+| First differing trace marker vs center | Left | Right |
+| --- | ---: | ---: |
+| Position source | 961 | 961 |
+| Projection offset | 963 | 963 |
+| Signed angle adjustment | 965 | 965 |
+| First angle-index result | 967 | 965 |
+| Later translation adjustment | 973 | 983 |
+| Depth-indexed lookup position | 977 | 987 |
+| Lookup value at that position | 985 | 995 |
+
+**Inference from verified execution:** through marker 975, center and left still index the same depth position even though their steering-sensitive source words and projected images differ. Later, left and then right advance to different lookup positions from center, so comparing their later screen positions no longer isolates steering from progression along the lookup. The sampled depth-indexed value is **not yet a decoded track heading**; the reason steering eventually changes lookup progression is **unsupported**. The previously selected 12 ROM geometry samples remain identical across steering at matching callback snapshots, which is a different fact from the changing state lookup position here.
+
+**Unsupported:** a complete arcade track/camera trajectory, physical camera pose, a causal mapping from each steering input to world-space displacement, or compatibility of this six-field arcade packet with the Sega CD's five-word *curve phase, ridge phase, bank, horizon, texture offset* test interface. The two interfaces encode different abstractions; their word counts alone prove neither compatibility nor incompatibility. No Sega CD timing, second arcade emulator or physical hardware test was run.
+
+**Next bounded test — hypothesis:** trace the upstream state words feeding the position source, signed angle adjustment and depth-indexed lookup over one short, fixed track section. Use a same-depth or same-lookup-position comparison when possible so steering and track progression can be distinguished. Only then attempt a private offline adapter that drives the existing Sega CD camera controls; retain the current renderer and interface until a visible mismatch demonstrates a missing degree of freedom.

@@ -54,7 +54,7 @@ end
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
-  or debug_mode == "projection")
+  or debug_mode == "projection" or debug_mode == "transform")
 local shared_watch_address = os.getenv("PDRIFT_SHARED_WATCH_ADDR")
   and tonumber(os.getenv("PDRIFT_SHARED_WATCH_ADDR"), 16)
 local shared_watch_until = tonumber(os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or "")
@@ -111,7 +111,7 @@ local frames = 0
 local state_ready = not state_load
 local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
-  or debug_mode == "projection"
+  or debug_mode == "projection" or debug_mode == "transform"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
 local input_breakpoints = {}
@@ -229,8 +229,10 @@ print("RAM_PROFILE=" .. ram_profile)
 emu.register_frame_done(function()
   if not state_ready then return end
   frames = frames + 1
-  if (ysprite_sequence_trace or debug_mode == "projection") and frames >= 960 and
-      frames <= (debug_mode == "projection" and sequence_end or ysprite_sequence_end) then
+  if (ysprite_sequence_trace or debug_mode == "projection"
+      or debug_mode == "transform") and frames >= 960 and
+      frames <= ((debug_mode == "projection" or debug_mode == "transform")
+        and sequence_end or ysprite_sequence_end) then
     manager.machine.debugger:command(
       string.format('printf "SEQUENCE_FRAME,%d\\n"', frames))
   end
@@ -494,6 +496,48 @@ emu.register_frame_done(function()
   if debug_mode == "projection" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print(string.format("PROJECTION_GATE_CLEARED,%d", frames))
+  end
+  if debug_mode == "transform" and frames == 960 then
+    local disasm_dir = os.getenv("PDRIFT_DISASM_DIR")
+    if disasm_dir then
+      for _, item in ipairs({ { "main-transform-angle", 0x34680 },
+                             { "main-transform-offset", 0x33940 },
+                             { "main-transform-position", 0x34770 } }) do
+        local path = string.format("%s/%s.asm", disasm_dir, item[1])
+        manager.machine.debugger:command(
+          string.format("dasm %s,%X,100,0,:maincpu", path, item[2]))
+        print("DISASM," .. path)
+      end
+    end
+    for _, tag in ipairs({ "maincpu", "subx", "suby" }) do
+      local device = assert(manager.machine.devices[":" .. tag])
+      local debugger = assert(device.debug)
+      local space = assert(device.spaces["program"])
+      local action = string.format(
+        'printf "TRANSFORM_WRITE cpu=%s pc=%%06X addr=%%06X data=%%08X a4=%%06X a5=%%06X d0=%%08X d1=%%08X\\n",pc,wpaddr,wpdata,a4,a5,d0,d1;g', tag)
+      local index = debugger:wpset(space, "w", 0x0c0096, 0x12, "1", action)
+      watchpoints[#watchpoints + 1] = { debugger, index }
+    end
+    if os.getenv("PDRIFT_TRANSFORM_SOURCE_TRACE") == "1" then
+      local trace = {
+        { 0x3397a, 'printf "TRANSFORM_OFFSET_SOURCE pc=%06X source=%04X\\n",pc,w@(a5+2e);g' },
+        { 0x346ec, 'printf "TRANSFORM_ANGLE_SOURCE pc=%06X road_depth=%04X road_angle=%04X smooth=%04X adjustment=%04X tilt=%04X d2=%08X\\n",pc,w@(a5+3e),w@cea18,w@cea1c,w@cea3a,w@(a5+7a),d2;g' },
+        { 0x3483c, 'printf "TRANSFORM_POSITION_SOURCE pc=%06X x=%04X y=%04X z=%04X\\n",pc,w@(a5+16),w@(a5+18),w@(a5+1a);g' },
+        { 0x33d1e, 'printf "TRANSFORM_PROJECT pc=%06X off=%04X angle1=%04X angle2=%04X x=%04X y=%04X z=%04X\\n",pc,w@c0098,w@c00a6,w@c00a4,w@c009c,w@c009e,w@c00a0;g' },
+      }
+      for _, item in ipairs(trace) do
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(item[1], item[1] == 0x33d1e
+            and "a5==c1c80" or "1", item[2])
+      end
+      print("TRANSFORM_SOURCE_TRACE_ARMED,3397A,346EC,3483C,33D1E")
+    end
+    print("TRANSFORM_WATCH_ARMED,0C0096,18,3_CPUS")
+  end
+  if debug_mode == "transform" and frames == sequence_end then
+    for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print(string.format("TRANSFORM_WATCH_CLEARED,%d", frames))
   end
   if debug_mode == "reads" and frames == 960 then
     local read_cpu = os.getenv("PDRIFT_READ_CPU")
