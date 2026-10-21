@@ -508,6 +508,17 @@ emu.register_frame_done(function()
           string.format("dasm %s,%X,100,0,:maincpu", path, item[2]))
         print("DISASM," .. path)
       end
+      if os.getenv("PDRIFT_TRANSFORM_UPSTREAM_TRACE") == "1" then
+        for _, item in ipairs({ { "main-state-position", 0x34a80 },
+                               { "main-state-offset", 0x34bd0 },
+                               { "main-state-adjustment", 0x34dc0 },
+                               { "main-state-lookup", 0x348f0 } }) do
+          local path = string.format("%s/%s.asm", disasm_dir, item[1])
+          manager.machine.debugger:command(
+            string.format("dasm %s,%X,120,0,:maincpu", path, item[2]))
+          print("DISASM," .. path)
+        end
+      end
     end
     for _, tag in ipairs({ "maincpu", "subx", "suby" }) do
       local device = assert(manager.machine.devices[":" .. tag])
@@ -517,6 +528,20 @@ emu.register_frame_done(function()
         'printf "TRANSFORM_WRITE cpu=%s pc=%%06X addr=%%06X data=%%08X a4=%%06X a5=%%06X d0=%%08X d1=%%08X\\n",pc,wpaddr,wpdata,a4,a5,d0,d1;g', tag)
       local index = debugger:wpset(space, "w", 0x0c0096, 0x12, "1", action)
       watchpoints[#watchpoints + 1] = { debugger, index }
+      if os.getenv("PDRIFT_TRANSFORM_UPSTREAM_TRACE") == "1" then
+        for _, item in ipairs({ { "position", 0x0c0856, 6 },
+                               { "lookup", 0x0c087e, 2 },
+                               { "angle_adjust", 0x0c08ba, 2 },
+                               { "late_adjust", 0x0c08ea, 2 },
+                               { "offset_source", 0x0c00ae, 2 } }) do
+          local source_action = string.format(
+            'printf "UPSTREAM_WRITE cpu=%s field=%s pc=%%06X addr=%%06X data=%%08X a5=%%06X d0=%%08X d1=%%08X\\n",pc,wpaddr,wpdata,a5,d0,d1;g',
+            tag, item[1])
+          local source_index = debugger:wpset(space, "w", item[2],
+            item[3], "1", source_action)
+          watchpoints[#watchpoints + 1] = { debugger, source_index }
+        end
+      end
     end
     if os.getenv("PDRIFT_TRANSFORM_SOURCE_TRACE") == "1" then
       local trace = {
@@ -525,6 +550,10 @@ emu.register_frame_done(function()
         { 0x3483c, 'printf "TRANSFORM_POSITION_SOURCE pc=%06X x=%04X y=%04X z=%04X\\n",pc,w@(a5+16),w@(a5+18),w@(a5+1a);g' },
         { 0x33d1e, 'printf "TRANSFORM_PROJECT pc=%06X off=%04X angle1=%04X angle2=%04X x=%04X y=%04X z=%04X\\n",pc,w@c0098,w@c00a6,w@c00a4,w@c009c,w@c009e,w@c00a0;g' },
       }
+      if os.getenv("PDRIFT_TRANSFORM_UPSTREAM_TRACE") == "1" then
+        trace[#trace + 1] = { 0x3490c,
+          'printf "UPSTREAM_SPEED pc=%06X speed=%04X half=%04X old_depth=%04X\\n",pc,w@(a5+24),d0,w@(a5+3e);g' }
+      end
       for _, item in ipairs(trace) do
         main_record_breakpoints[#main_record_breakpoints + 1] =
           cpu_debug:bpset(item[1], item[1] == 0x33d1e
