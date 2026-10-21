@@ -45,11 +45,32 @@ end
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite")
+local shared_watch_address = os.getenv("PDRIFT_SHARED_WATCH_ADDR")
+  and tonumber(os.getenv("PDRIFT_SHARED_WATCH_ADDR"), 16)
+assert(not os.getenv("PDRIFT_SHARED_WATCH_ADDR") or
+  (debug_mode == "shared" and shared_watch_address
+    and shared_watch_address >= 0x0c0000
+    and shared_watch_address <= 0x0cfff0
+    and shared_watch_address % 2 == 0))
 local ysprite_watch_offset = tonumber(os.getenv("PDRIFT_YSPRITE_WATCH_OFFSET") or "E6E0", 16)
 assert(ysprite_watch_offset and ysprite_watch_offset % 16 == 0
   and ysprite_watch_offset >= 0 and ysprite_watch_offset <= 0xfff0)
+local ysprite_input_trace = os.getenv("PDRIFT_YSPRITE_INPUT_TRACE") == "1"
+assert(not ysprite_input_trace or debug_mode == "ysprite")
 local ram_space = (ram_output or debug_mode)
   and assert(manager.machine.devices[":maincpu"].spaces["program"])
+local record_tap_enabled = os.getenv("PDRIFT_RECORD_TAP") == "1"
+assert(not record_tap_enabled or ram_space)
+local record_override_value = os.getenv("PDRIFT_RECORD_OVERRIDE_VALUE")
+  and tonumber(os.getenv("PDRIFT_RECORD_OVERRIDE_VALUE"), 16)
+local record_override_frame = tonumber(os.getenv("PDRIFT_RECORD_OVERRIDE_FRAME") or "")
+assert((not os.getenv("PDRIFT_RECORD_OVERRIDE_VALUE")
+    and not os.getenv("PDRIFT_RECORD_OVERRIDE_FRAME"))
+  or (record_tap_enabled and record_override_value
+    and record_override_value >= 0 and record_override_value <= 0xffff
+    and record_override_frame and record_override_frame >= 955
+    and record_override_frame <= 967))
+local record_tap
 local steer_pulse = tonumber(os.getenv("PDRIFT_STEER_PULSE") or "")
 assert(not steer_pulse or (steer_pulse >= 32 and steer_pulse <= 224))
 local steer_return = tonumber(os.getenv("PDRIFT_STEER_RETURN") or "1080")
@@ -60,6 +81,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
+local input_breakpoints = {}
 if debug_watch then
   assert(manager.machine.debugger)
   manager.machine.debugger.execution_state = "run"
@@ -166,6 +188,25 @@ emu.register_frame_done(function()
     steering:set_value(steer_pulse)
     print(string.format("INPUT,960,steer-%d", steer_pulse))
   end
+  if record_tap_enabled and frames == 955 then
+    record_tap = ram_space:install_write_tap(
+      0x0c1c84, 0x0c1c85, "pdrift-main-source-record-x",
+      function(offset, data, mask)
+        print(string.format("RECORD_TAP,%d,%06X,%04X,%04X",
+          frames, offset, data, mask))
+        if record_override_frame and frames == record_override_frame then
+          assert(mask == 0xffff)
+          print(string.format("RECORD_OVERRIDE,%d,%06X,%04X,%04X",
+            frames, offset, data, record_override_value))
+          return record_override_value
+        end
+      end)
+    print("RECORD_TAP_ARMED,955,0C1C84")
+  end
+  if record_tap_enabled and frames == 968 then
+    record_tap:remove()
+    print("RECORD_TAP_CLEARED,968")
+  end
   if swap_output and frames == 955 then
     for index = 1, 16 do
       swap_shadow[index] = rotate_space:read_u16(0x1807e0 + 2 * (index - 1))
@@ -242,23 +283,40 @@ emu.register_frame_done(function()
           string.format("dasm %s,%X,80,0,:maincpu", path, item[2]))
         print("DISASM," .. path)
       end
+      if shared_watch_address then
+        local path = disasm_dir .. "/main-sprite-record-writer.asm"
+        manager.machine.debugger:command(
+          string.format("dasm %s,33E00,100,0,:maincpu", path))
+        print("DISASM," .. path)
+        local transform_path = disasm_dir .. "/main-sprite-transform.asm"
+        manager.machine.debugger:command(
+          string.format("dasm %s,33D00,100,0,:maincpu", transform_path))
+        print("DISASM," .. transform_path)
+      end
     end
     for _, tag in ipairs({ "maincpu", "subx", "suby" }) do
       local device = assert(manager.machine.devices[":" .. tag])
       local debugger = assert(device.debug)
       local space = assert(device.spaces["program"])
-      for _, address in ipairs({ 0x0ce0ce, 0x0cea0e, 0x0cff26 }) do
+      for _, address in ipairs(shared_watch_address and { shared_watch_address }
+          or { 0x0ce0ce, 0x0cea0e, 0x0cff26 }) do
         local action = string.format(
           'printf "WATCH cpu=%s addr=%%06X data=%%08X pc=%%06X\\n",wpaddr,wpdata,pc;g', tag)
-        local index = debugger:wpset(space, "w", address, 2, "1", action)
+        if shared_watch_address and os.getenv("PDRIFT_SHARED_REGS") == "1" then
+          action = string.format(
+            'printf "RECORD_WRITE cpu=%s addr=%%06X data=%%08X pc=%%06X a0=%%06X a5=%%06X d0=%%08X\\n",wpaddr,wpdata,pc,a0,a5,d0;g', tag)
+        end
+        local index = debugger:wpset(space, "w", address,
+          shared_watch_address and 16 or 2, "1", action)
         watchpoints[#watchpoints + 1] = { debugger, index }
       end
     end
     print("WATCH_ARMED,shared," .. tostring(#watchpoints))
   end
-  if debug_mode == "shared" and frames == 965 then
+  if debug_mode == "shared" and frames ==
+      (shared_watch_address and 967 or 965) then
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
-    print("WATCH_CLEARED,965")
+    print(string.format("WATCH_CLEARED,%d", frames))
   end
   if debug_mode == "reads" and frames == 960 then
     local read_cpu = os.getenv("PDRIFT_READ_CPU")
@@ -303,17 +361,37 @@ emu.register_frame_done(function()
       manager.machine.debugger:command(
         string.format("dasm %s,E080,100,0,:subx", path))
       print("DISASM," .. path)
+      local caller_path = disasm_dir .. "/subx-ysprite-caller.asm"
+      manager.machine.debugger:command(
+        string.format("dasm %s,DD40,220,0,:subx", caller_path))
+      print("DISASM," .. caller_path)
+      local transform_path = disasm_dir .. "/subx-ysprite-transform.asm"
+      manager.machine.debugger:command(
+        string.format("dasm %s,DF80,100,0,:subx", transform_path))
+      print("DISASM," .. transform_path)
     end
     local debugger = assert(subx.debug)
     local space = assert(subx.spaces["program"])
     local action = 'printf "YSPRITE_WRITE addr=%06X data=%08X pc=%06X\\n",wpaddr,wpdata,pc;g'
+    if os.getenv("PDRIFT_YSPRITE_REGS") == "1" then
+      action = 'printf "YSPRITE_REGS addr=%06X data=%08X pc=%06X d0=%08X d1=%08X d2=%08X a2=%06X a5=%06X\\n",wpaddr,wpdata,pc,d0,d1,d2,a2,a5;g'
+    end
     local address = 0x180000 + ysprite_watch_offset
     local index = debugger:wpset(space, "w", address, 16, "1", action)
     watchpoints[#watchpoints + 1] = { debugger, index }
     print(string.format("WATCH_ARMED,ysprite,%06X,16", address))
+    if ysprite_input_trace then
+      local before = 'printf "YSPRITE_INPUT_BEFORE pc=%06X a0=%06X index=%08X a2=%06X\\n",pc,a0,d0,a2;g'
+      local after = 'printf "YSPRITE_INPUT_AFTER pc=%06X a0=%06X d0=%08X d1=%08X d2=%08X d3=%08X a2=%06X\\n",pc,a0,d0,d1,d2,d3,a2;g'
+      input_breakpoints[1] = debugger:bpset(0xdd64, "a2==18c630", before)
+      input_breakpoints[2] = debugger:bpset(0xdd6a, "a2==18c630", after)
+      print("INPUT_TRACE_ARMED,DD64,DD6A,18C630")
+    end
   end
   if debug_mode == "ysprite" and frames == 967 then
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
+    local debugger = manager.machine.devices[":subx"].debug
+    for _, index in ipairs(input_breakpoints) do debugger:bpclear(index) end
     print("WATCH_CLEARED,ysprite,967")
   end
   if steer_pulse and frames == steer_return then
