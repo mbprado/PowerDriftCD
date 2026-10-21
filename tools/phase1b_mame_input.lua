@@ -29,7 +29,7 @@ if source_override_range then
 end
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
-  or debug_mode == "reads")
+  or debug_mode == "reads" or debug_mode == "ysprite")
 local ram_space = (ram_output or debug_mode)
   and assert(manager.machine.devices[":maincpu"].spaces["program"])
 local steer_pulse = tonumber(os.getenv("PDRIFT_STEER_PULSE") or "")
@@ -39,7 +39,7 @@ assert(steer_return and steer_return > 960 and steer_return <= 1080)
 local frames = 0
 local state_ready = not state_load
 local debug_watch = debug_mode == "1" or debug_mode == "shared"
-  or debug_mode == "reads"
+  or debug_mode == "reads" or debug_mode == "ysprite"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
 if debug_watch then
@@ -264,6 +264,27 @@ emu.register_frame_done(function()
   if debug_mode == "reads" and frames == 965 then
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     print("WATCH_CLEARED,965")
+  end
+  if debug_mode == "ysprite" and frames == 960 then
+    local subx = assert(manager.machine.devices[":subx"])
+    manager.machine.debugger.visible_cpu = subx
+    local disasm_dir = os.getenv("PDRIFT_DISASM_DIR")
+    if disasm_dir then
+      local path = disasm_dir .. "/subx-ysprite-writer.asm"
+      manager.machine.debugger:command(
+        string.format("dasm %s,E080,100,0,:subx", path))
+      print("DISASM," .. path)
+    end
+    local debugger = assert(subx.debug)
+    local space = assert(subx.spaces["program"])
+    local action = 'printf "YSPRITE_WRITE addr=%06X data=%08X pc=%06X\\n",wpaddr,wpdata,pc;g'
+    local index = debugger:wpset(space, "w", 0x18e6e0, 16, "1", action)
+    watchpoints[#watchpoints + 1] = { debugger, index }
+    print("WATCH_ARMED,ysprite,18E6E0,16")
+  end
+  if debug_mode == "ysprite" and frames == 967 then
+    for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
+    print("WATCH_CLEARED,ysprite,967")
   end
   if steer_pulse and frames == steer_return then
     steering:set_value(128)
