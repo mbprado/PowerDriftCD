@@ -8,6 +8,21 @@ local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
 local rotate_output = os.getenv("PDRIFT_ROTATE_DIR")
 local swap_output = os.getenv("PDRIFT_SWAP_DIR")
+local rotate_override = os.getenv("PDRIFT_ROTATE_OVERRIDE")
+assert(not rotate_override or swap_output)
+local rotate_override_words
+if rotate_override then
+  local file = assert(io.open(rotate_override, "rb"))
+  local bytes = assert(file:read("*a"))
+  assert(file:close())
+  assert(#bytes == 32)
+  rotate_override_words = {}
+  for index = 1, 16 do
+    local offset = 2 * index - 1
+    rotate_override_words[index] = (bytes:byte(offset) << 8)
+      | bytes:byte(offset + 1)
+  end
+end
 local source_output = os.getenv("PDRIFT_SOURCE_DIR")
 local source_override = os.getenv("PDRIFT_SOURCE_OVERRIDE")
 local source_override_range = os.getenv("PDRIFT_SOURCE_OVERRIDE_RANGE")
@@ -74,6 +89,7 @@ local swap_read_tap
 local swap_write_tap
 local swaps = 0
 local writes_since_swap = 0
+local rotation_overrides = 0
 local swap_shadow = {}
 local function swap_bytes(words)
   local bytes = {}
@@ -156,9 +172,14 @@ emu.register_frame_done(function()
       function(offset, data, mask)
         local index = math.floor((offset - 0x1807e0) / 2) + 1
         assert(index >= 1 and index <= 16)
+        if rotate_override_words and frames == 966 then
+          data = rotate_override_words[index]
+          rotation_overrides = rotation_overrides + 1
+        end
         swap_shadow[index] = (swap_shadow[index] & (~mask & 0xffff))
           | (data & mask)
         writes_since_swap = writes_since_swap + 1
+        if rotate_override_words and frames == 966 then return data end
       end)
     swap_read_tap = rotate_space:install_read_tap(
       0x198000, 0x198001, "pdrift-rotation-buffer-swap",
@@ -171,6 +192,11 @@ emu.register_frame_done(function()
         local post = save_swap_words("post", swap_shadow)
         print(string.format("SWAP,%d,%d,%d,%s,%s", frames, swaps,
           writes_since_swap, pre, post))
+        if rotation_overrides > 0 then
+          print(string.format("ROTATE_OVERRIDE,%d,%d,%s", frames,
+            rotation_overrides, rotate_override))
+          rotation_overrides = 0
+        end
         writes_since_swap = 0
       end)
     print("SWAP_TRACE_ARMED,955")
