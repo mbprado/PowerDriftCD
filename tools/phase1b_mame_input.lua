@@ -45,6 +45,9 @@ end
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite")
+local ysprite_watch_offset = tonumber(os.getenv("PDRIFT_YSPRITE_WATCH_OFFSET") or "E6E0", 16)
+assert(ysprite_watch_offset and ysprite_watch_offset % 16 == 0
+  and ysprite_watch_offset >= 0 and ysprite_watch_offset <= 0xfff0)
 local ram_space = (ram_output or debug_mode)
   and assert(manager.machine.devices[":maincpu"].spaces["program"])
 local steer_pulse = tonumber(os.getenv("PDRIFT_STEER_PULSE") or "")
@@ -304,9 +307,10 @@ emu.register_frame_done(function()
     local debugger = assert(subx.debug)
     local space = assert(subx.spaces["program"])
     local action = 'printf "YSPRITE_WRITE addr=%06X data=%08X pc=%06X\\n",wpaddr,wpdata,pc;g'
-    local index = debugger:wpset(space, "w", 0x18e6e0, 16, "1", action)
+    local address = 0x180000 + ysprite_watch_offset
+    local index = debugger:wpset(space, "w", address, 16, "1", action)
     watchpoints[#watchpoints + 1] = { debugger, index }
-    print("WATCH_ARMED,ysprite,18E6E0,16")
+    print(string.format("WATCH_ARMED,ysprite,%06X,16", address))
   end
   if debug_mode == "ysprite" and frames == 967 then
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
