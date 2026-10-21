@@ -10,7 +10,23 @@ local rotate_output = os.getenv("PDRIFT_ROTATE_DIR")
 local swap_output = os.getenv("PDRIFT_SWAP_DIR")
 local source_output = os.getenv("PDRIFT_SOURCE_DIR")
 local source_override = os.getenv("PDRIFT_SOURCE_OVERRIDE")
+local source_override_range = os.getenv("PDRIFT_SOURCE_OVERRIDE_RANGE")
+local state_save = os.getenv("PDRIFT_STATE_SAVE")
+local state_load = os.getenv("PDRIFT_STATE_LOAD")
+assert(not state_save or not state_load)
 assert(not source_override or source_output)
+assert(not source_override_range or source_override)
+local override_start, override_size = 0, 0x10000
+if source_override_range then
+  local start_hex, size_hex = source_override_range:match("^(%x+):(%x+)$")
+  assert(start_hex and size_hex,
+    "PDRIFT_SOURCE_OVERRIDE_RANGE must be hex start:size")
+  override_start = assert(tonumber(start_hex, 16))
+  override_size = assert(tonumber(size_hex, 16))
+  assert(override_start % 16 == 0 and override_size % 16 == 0
+    and override_size > 0 and override_start + override_size <= 0x10000,
+    "source override range must be 16-byte aligned and within 64 KiB")
+end
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads")
@@ -21,6 +37,7 @@ assert(not steer_pulse or (steer_pulse >= 32 and steer_pulse <= 224))
 local steer_return = tonumber(os.getenv("PDRIFT_STEER_RETURN") or "1080")
 assert(steer_return and steer_return > 960 and steer_return <= 1080)
 local frames = 0
+local state_ready = not state_load
 local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
@@ -119,6 +136,7 @@ print("STEER_PULSE=" .. tostring(steer_pulse))
 print("STEER_RETURN=" .. steer_return)
 print("RAM_PROFILE=" .. ram_profile)
 emu.register_frame_done(function()
+  if not state_ready then return end
   frames = frames + 1
   if frames == 60 then coin:set_value(1); print("INPUT,60,coin-on") end
   if frames == 65 then coin:set_value(0); print("INPUT,65,coin-off") end
@@ -274,11 +292,25 @@ emu.register_frame_done(function()
     local bytes = assert(file:read("*a"))
     assert(file:close())
     assert(#bytes == 0x10000)
-    for offset = 0, 0xffff do
+    for offset = override_start, override_start + override_size - 1 do
       source_x_space:write_u8(0x180000 + offset, bytes:byte(offset + 1))
     end
-    print(string.format("SOURCE_OVERRIDE,966,ysprites,%d,%s", #bytes,
-      source_override))
+    print(string.format("SOURCE_OVERRIDE,966,ysprites,%04X,%04X,%s",
+      override_start, override_size, source_override))
     capture_source(frames, "ysprites-after", source_x_space, 0x180000, 0x10000)
   end
+  if state_save and frames == 950 then
+    print("STATE_SAVE,950," .. state_save)
+    manager.machine:save(state_save)
+  end
 end, "frame")
+if state_load then
+  emu.add_machine_post_load_notifier(function()
+    frames = 950
+    pedal:set_value(255)
+    steering:set_value(128)
+    state_ready = true
+    print("STATE_LOAD,950," .. state_load)
+  end)
+  manager.machine:load(state_load)
+end
