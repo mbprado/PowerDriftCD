@@ -6,6 +6,7 @@ local steering = assert(ports[":ADC.5"].fields["Paddle"])
 local screen = assert(manager.machine.screens[":screen"])
 local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
+local geometry_output = os.getenv("PDRIFT_GEOMETRY_SAMPLE_DIR")
 local rotate_output = os.getenv("PDRIFT_ROTATE_DIR")
 local swap_output = os.getenv("PDRIFT_SWAP_DIR")
 local rotate_override = os.getenv("PDRIFT_ROTATE_OVERRIDE")
@@ -47,6 +48,10 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite")
 local shared_watch_address = os.getenv("PDRIFT_SHARED_WATCH_ADDR")
   and tonumber(os.getenv("PDRIFT_SHARED_WATCH_ADDR"), 16)
+local shared_watch_until = tonumber(os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or "")
+assert(not os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or
+  (debug_mode == "shared" and shared_watch_address and shared_watch_until
+    and shared_watch_until >= 967 and shared_watch_until <= 975))
 assert(not os.getenv("PDRIFT_SHARED_WATCH_ADDR") or
   (debug_mode == "shared" and shared_watch_address
     and shared_watch_address >= 0x0c0000
@@ -57,8 +62,13 @@ assert(ysprite_watch_offset and ysprite_watch_offset % 16 == 0
   and ysprite_watch_offset >= 0 and ysprite_watch_offset <= 0xfff0)
 local ysprite_input_trace = os.getenv("PDRIFT_YSPRITE_INPUT_TRACE") == "1"
 assert(not ysprite_input_trace or debug_mode == "ysprite")
-local ram_space = (ram_output or debug_mode)
+local ram_space = (ram_output or debug_mode or geometry_output)
   and assert(manager.machine.devices[":maincpu"].spaces["program"])
+local geometry_file
+if geometry_output then
+  geometry_file = assert(io.open(geometry_output .. "/geometry-samples.csv", "w"))
+  assert(geometry_file:write("frame,index,object,depth,table,sample0,sample1,sample2,source16,source18,source1a,projected4,projected6,global16,global18,global1a,global1c,global1e,global20,global24,global26,coef1sin,coef1cos,coef2sin,coef2cos,screen_y_offset\n"))
+end
 local record_tap_enabled = os.getenv("PDRIFT_RECORD_TAP") == "1"
 assert(not record_tap_enabled or ram_space)
 local record_override_value = os.getenv("PDRIFT_RECORD_OVERRIDE_VALUE")
@@ -268,6 +278,46 @@ emu.register_frame_done(function()
     print(string.format("SWAP_SCREEN,%d,%s,%s", frames, path,
       tostring(screen:snapshot(path))))
   end
+  if geometry_file and frames >= 960 and frames <= 970 then
+    local table_base = (ram_space:read_u16(0x0ceb00) << 16)
+      | ram_space:read_u16(0x0ceb02)
+    local globals = {}
+    for _, offset in ipairs({ 0x16, 0x18, 0x1a, 0x1c, 0x1e, 0x20 }) do
+      globals[#globals + 1] = ram_space:read_u16(0x0c0080 + offset)
+    end
+    local angle2 = ram_space:read_u16(0x0c0080 + 0x24)
+    local angle1 = ram_space:read_u16(0x0c0080 + 0x26)
+    local lookup1 = 0x0ef6 + 2 * angle1
+    local lookup2 = 0x0ef6 + 2 * angle2
+    local coefficients = {
+      angle2, angle1,
+      ram_space:read_u16(lookup1 - 0x600), ram_space:read_u16(lookup1),
+      ram_space:read_u16(lookup2 - 0x600), ram_space:read_u16(lookup2),
+      ram_space:read_u16(0x0cea3e),
+    }
+    for index = 0, 11 do
+      local object = 0x0c1c80 + index * 0x40
+      local depth = ram_space:read_u16(object + 0x3e)
+      local sample = table_base + 6 * ((depth & 0xffe0) >> 5)
+      local values = {
+        frames, index, object, depth, sample,
+        ram_space:read_u16(sample), ram_space:read_u16(sample + 2),
+        ram_space:read_u16(sample + 4),
+        ram_space:read_u16(object + 0x16),
+        ram_space:read_u16(object + 0x18),
+        ram_space:read_u16(object + 0x1a),
+        ram_space:read_u16(object + 0x04),
+        ram_space:read_u16(object + 0x06),
+      }
+      for _, value in ipairs(globals) do values[#values + 1] = value end
+      for _, value in ipairs(coefficients) do values[#values + 1] = value end
+      assert(geometry_file:write(string.format(
+        "%d,%d,%06X,%04X,%06X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X,%04X\n",
+        table.unpack(values))))
+    end
+    print(string.format("GEOMETRY_SAMPLES,%d,12,%06X", frames, table_base))
+    if frames == 970 then assert(geometry_file:close()) end
+  end
   if debug_mode == "1" and frames == 960 then
     local action = 'printf "WATCH addr=%06X data=%08X pc=%06X sp=%06X\\n",wpaddr,wpdata,pc,a7;g'
     watchpoints[1] = cpu_debug:wpset(ram_space, "w", 0x1fff72, 2, "wpdata!=3d00", action)
@@ -380,7 +430,7 @@ emu.register_frame_done(function()
     end
   end
   if debug_mode == "shared" and frames ==
-      (shared_watch_address and 967 or 965) then
+      (shared_watch_until or (shared_watch_address and 967 or 965)) then
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print(string.format("WATCH_CLEARED,%d", frames))
