@@ -8,6 +8,9 @@ local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
 local rotate_output = os.getenv("PDRIFT_ROTATE_DIR")
 local swap_output = os.getenv("PDRIFT_SWAP_DIR")
+local source_output = os.getenv("PDRIFT_SOURCE_DIR")
+local source_override = os.getenv("PDRIFT_SOURCE_OVERRIDE")
+assert(not source_override or source_output)
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads")
@@ -45,6 +48,10 @@ if ram_profile == "early" then
 end
 local ram_size = 0x4000
 local rotate_space = (rotate_output or swap_output)
+  and assert(manager.machine.devices[":suby"].spaces["program"])
+local source_x_space = source_output
+  and assert(manager.machine.devices[":subx"].spaces["program"])
+local source_y_space = source_output
   and assert(manager.machine.devices[":suby"].spaces["program"])
 local swap_read_tap
 local swap_write_tap
@@ -90,6 +97,18 @@ local function capture_rotate(frame)
   assert(file:write(table.concat(bytes)))
   assert(file:close())
   print(string.format("ROTATE,%d,1807E0,32,%s", frame, path))
+end
+local function capture_source(frame, name, space, address, size)
+  local bytes = {}
+  for offset = 0, size - 1 do
+    bytes[#bytes + 1] = string.char(space:read_u8(address + offset))
+  end
+  local path = string.format("%s/source-%04d-%s.bin", source_output, frame, name)
+  local file = assert(io.open(path, "wb"))
+  assert(file:write(table.concat(bytes)))
+  assert(file:close())
+  print(string.format("SOURCE,%d,%s,%06X,%d,%s",
+    frame, name, address, size, path))
 end
 coin:set_value(0)
 start:set_value(0)
@@ -244,5 +263,22 @@ emu.register_frame_done(function()
   end
   if rotate_output and rotate_captures[frames] then
     capture_rotate(frames)
+  end
+  if source_output and frames >= 960 and frames <= 970 then
+    capture_source(frames, "ysprites", source_x_space, 0x180000, 0x10000)
+    capture_source(frames, "bsprites", source_y_space, 0x188000, 0x1000)
+    capture_source(frames, "palette", source_y_space, 0x190000, 0x4000)
+  end
+  if source_override and frames == 966 then
+    local file = assert(io.open(source_override, "rb"))
+    local bytes = assert(file:read("*a"))
+    assert(file:close())
+    assert(#bytes == 0x10000)
+    for offset = 0, 0xffff do
+      source_x_space:write_u8(0x180000 + offset, bytes:byte(offset + 1))
+    end
+    print(string.format("SOURCE_OVERRIDE,966,ysprites,%d,%s", #bytes,
+      source_override))
+    capture_source(frames, "ysprites-after", source_x_space, 0x180000, 0x10000)
   end
 end, "frame")
