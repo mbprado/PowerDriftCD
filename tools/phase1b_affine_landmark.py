@@ -30,13 +30,13 @@ def directory(root, side, frame, index, kind):
     return root / f"phase1b-near-hidden-{side}-{frame}-depth{index}-affine-{kind}"
 
 
-def run(root, mame, rompath, state):
+def run(root, mame, rompath, state, frames=FRAMES):
     items = plan(root)
     old = os.environ.get("PDRIFT_YBITMAP_DIR")
     os.environ["PDRIFT_YBITMAP_DIR"] = "."
     try:
         for side in SIDES:
-            for frame in FRAMES:
+            for frame in frames:
                 for index in DEPTHS:
                     item = items[side, frame, index]
                     baseline = (root / f"phase1b-depth-sequence-{side}" /
@@ -75,11 +75,12 @@ def mapped_pixels(mask, transform, landmark_row):
     return full, landmark
 
 
-def analyze(root):
+def analyze(root, frames=FRAMES, output_name="phase1b-affine-landmark-results.json",
+            row_offset=3):
     items = plan(root)
     matched = json.loads((root / "phase1b-projection-window/results.json").read_text())
     assert all(matched["exact_lookup_position"][str(frame - 2)]["left"]
-               for frame in FRAMES)
+               for frame in frames)
     geometry = {}
     for side in SIDES:
         with (root / f"phase1b-depth-sequence-{side}/geometry-samples.csv").open() as file:
@@ -87,7 +88,7 @@ def analyze(root):
                               for row in csv.DictReader(file)}
     results = []
     for side in SIDES:
-        for frame in FRAMES:
+        for frame in frames:
             for index in DEPTHS:
                 item = items[side, frame, index]
                 baseline = directory(root, side, frame, index, "baseline")
@@ -113,7 +114,7 @@ def analyze(root):
                     previous / f"swap-screen-{frame+1:04d}.png").read_bytes()
                 descriptor = struct.unpack_from(">8H", original, slot)
                 assert f"{descriptor[3]:04X}" == item["graphic"]
-                landmark_row = (descriptor[2] & 0xfff) - 0x600 + 3
+                landmark_row = (descriptor[2] & 0xfff) - 0x600 + row_offset
                 bitmap_a = baseline / f"ybitmap-{frame:04d}.raw"
                 bitmap_b = hidden / f"ybitmap-{frame:04d}.raw"
                 mask = native_mask(bitmap_a.read_bytes(), bitmap_b.read_bytes())
@@ -165,7 +166,7 @@ def analyze(root):
                       "full misses pre/post", len(actual - pre),
                       len(actual - post))
     comparisons = []
-    for frame in FRAMES:
+    for frame in frames:
         for index in DEPTHS:
             center = next(item for item in results if item["side"] == "center"
                           and item["descriptor_frame"] == frame
@@ -183,7 +184,7 @@ def analyze(root):
                                 left["predicted_screen_left_x"]
                                 - center["predicted_screen_left_x"]})
     training = [item for item in comparisons if item["descriptor_frame"] == 970]
-    held = [item for item in comparisons if item["descriptor_frame"] == 974]
+    held = [item for item in comparisons if item["descriptor_frame"] != 970]
     gain = sum(item["projected_x_delta"] * item["screen_left_edge_delta"]
                for item in training) / sum(item["projected_x_delta"] ** 2
                                           for item in training)
@@ -193,10 +194,11 @@ def analyze(root):
         item["prediction_error_pixels"] = (
             item["screen_left_edge_delta"]
             - item["screen_edge_prediction_from_training_gain"])
-    output = root / "phase1b-affine-landmark-results.json"
+    output = root / output_name
     output.write_text(json.dumps({"cases": results, "comparisons": comparisons,
-                                  "training_gain": gain}, indent=2) + "\n")
-    print("four edge shifts:", comparisons)
+                                  "training_gain": gain,
+                                  "native_row_offset": row_offset}, indent=2) + "\n")
+    print("edge shifts:", comparisons)
     print("training gain", gain, "held-out errors",
           [item["prediction_error_pixels"] for item in held])
     print("private results:", output)
@@ -209,9 +211,17 @@ if __name__ == "__main__":
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--rompath", type=Path)
     parser.add_argument("--state", type=Path)
+    parser.add_argument("--frames", type=int, nargs="+", default=FRAMES,
+                        help="Descriptor callbacks to analyze; callback 970 calibrates gain")
+    parser.add_argument("--output-name", default="phase1b-affine-landmark-results.json")
+    parser.add_argument("--row-offset", type=int, default=3,
+                        help="Native descriptor Y offset of the fixed landmark")
     args = parser.parse_args()
+    assert 970 in args.frames and len(set(args.frames)) == len(args.frames)
     if args.action == "run":
         assert args.mame and args.rompath and args.state
-        run(args.private_root.resolve(), args.mame, args.rompath, args.state)
+        run(args.private_root.resolve(), args.mame, args.rompath, args.state,
+            args.frames)
     else:
-        analyze(args.private_root.resolve())
+        analyze(args.private_root.resolve(), args.frames, args.output_name,
+                args.row_offset)
