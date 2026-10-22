@@ -44,10 +44,10 @@ def projection_deltas(rows):
                             ("depth", "table", "sample0", "sample1", "sample2"))
                       for side in SIDES}
             assert len(source) == 1
-        center = tuple(signed16(hexfield(rows["center"][epoch + 2, index],
+        center = tuple(signed16(hexfield(rows["center"][epoch, index],
                                          "projected4")) for index in DEPTH_INDEXES)
         for side in SIDES[1:]:
-            other = tuple(signed16(hexfield(rows[side][epoch + 2, index],
+            other = tuple(signed16(hexfield(rows[side][epoch, index],
                                             "projected4")) for index in DEPTH_INDEXES)
             outputs[epoch, side] = tuple(a - b for a, b in zip(other, center))
     assert all(outputs[960, side] == (0, 0, 0) for side in SIDES[1:])
