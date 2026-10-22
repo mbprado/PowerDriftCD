@@ -1,0 +1,5 @@
+--- a/src/mame/sega/segaybd.cpp
++++ b/src/mame/sega/segaybd.cpp
+@@ -485 +485 @@
+-		if (frame >= 960 && frame <= 970)
++		if (frame >= 960 && frame <= 974)
