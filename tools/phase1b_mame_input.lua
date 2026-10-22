@@ -121,6 +121,12 @@ local geometry_override_word = os.getenv("PDRIFT_GEOMETRY_OVERRIDE_WORD")
 assert(not os.getenv("PDRIFT_GEOMETRY_OVERRIDE_WORD") or
   (debug_mode == "shared" and geometry_override_word
     and geometry_override_word >= 0 and geometry_override_word <= 0xffff))
+local projection_global_x_delta = os.getenv("PDRIFT_PROJECTION_GLOBAL_X_DELTA")
+  and tonumber(os.getenv("PDRIFT_PROJECTION_GLOBAL_X_DELTA"), 16)
+assert(not os.getenv("PDRIFT_PROJECTION_GLOBAL_X_DELTA") or
+  (debug_mode == "shared" and projection_global_x_delta
+    and projection_global_x_delta >= 0 and projection_global_x_delta <= 0x100
+    and not geometry_override_word))
 if debug_watch then
   assert(manager.machine.debugger)
   manager.machine.debugger.execution_state = "run"
@@ -472,6 +478,22 @@ emu.register_frame_done(function()
         cpu_debug:bpset(0x33e84, condition, exit_action)
       print(string.format("GEOMETRY_OVERRIDE_ARMED,%04X,%04X",
         original, geometry_override_word))
+    end
+    if projection_global_x_delta then
+      for _, object in ipairs({ 0x0c1d00, 0x0c1d40, 0x0c1d80 }) do
+        local condition = string.format("a5==%x&&a0==c9800", object)
+        local entry = string.format(
+          'printf "GLOBAL_X_ENTRY pc=%%06X a5=%%06X old=%%04X\\n",pc,a5,w@(a4+1c);w@(a4+1c)=w@(a4+1c)+%x;printf "GLOBAL_X_CHANGED a5=%%06X value=%%04X\\n",a5,w@(a4+1c);g',
+          projection_global_x_delta)
+        local exit_action = string.format(
+          'printf "GLOBAL_X_OUTPUT a5=%%06X x=%%04X y=%%04X changed=%%04X\\n",a5,d0,w@(a5+6),w@(a4+1c);w@(a4+1c)=w@(a4+1c)-%x;printf "GLOBAL_X_RESTORED a5=%%06X value=%%04X\\n",a5,w@(a4+1c);g',
+          projection_global_x_delta)
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(0x33d1e, condition, entry)
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(0x33e84, condition, exit_action)
+      end
+      print(string.format("GLOBAL_X_OVERRIDE_ARMED,%X,3", projection_global_x_delta))
     end
   end
   if debug_mode == "shared" and frames ==
