@@ -512,7 +512,11 @@ animation_sums:
 road_sums:
 .ifdef ROAD_LIVE_CAMERA
 .ifdef ROAD_WIDE
+ .ifdef ROAD_WIDE_GEOMETRY
+    .include "build/perspective-road/road-wide-geometry-sums.inc"
+ .else
     .include "build/perspective-road/road-live-camera-wide-sums.inc"
+ .endif
 .else
     .include "build/perspective-road/road-live-camera-sums.inc"
 .endif

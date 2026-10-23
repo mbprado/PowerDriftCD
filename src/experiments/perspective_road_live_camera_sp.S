@@ -36,21 +36,42 @@ wait_sub:
 
     lea road_stamps(%pc),%a0
     lea 0x080000,%a1
+ .ifdef ROAD_WIDE_GEOMETRY
+    move.w #447,%d0
+ .else
     move.w #191,%d0
+ .endif
 copy_stamps:
     move.w (%a0)+,(%a1)+
     dbf %d0,copy_stamps
     lea 0x0a0000,%a1
     move.w #255,%d0
 grass_map:
+ .ifdef ROAD_WIDE_GEOMETRY
+    move.w #6,(%a1)+
+ .else
     move.w #2,(%a1)+
+ .endif
     dbf %d0,grass_map
+ .ifdef ROAD_WIDE_GEOMETRY
+    lea 0x0a000c,%a1 /* five road stamps occupy columns 6..10 */
+    move.w #15,%d0
+wide_road_map:
+    move.w #1,(%a1)+
+    move.w #2,(%a1)+
+    move.w #3,(%a1)+
+    move.w #4,(%a1)+
+    move.w #5,(%a1)
+    adda.w #24,%a1
+    dbf %d0,wide_road_map
+ .else
     lea 0x0a0010,%a1 /* road occupies source-map column 8 */
     move.w #15,%d0
 road_map:
     move.w #1,(%a1)
     adda.w #32,%a1
     dbf %d0,road_map
+ .endif
 
     move.w 0xff800c,0x098004
     move.w 0xff8018,0x098006 /* texture offset */
@@ -73,7 +94,11 @@ build_trace:
     moveq #0,%d2
 depth_ready:
 .ifdef ROAD_WIDE
+ .ifdef ROAD_WIDE_GEOMETRY
+    moveq #10,%d1
+ .else
     moveq #12,%d1
+ .endif
 .else
     moveq #16,%d1
 .endif
@@ -85,7 +110,11 @@ test_middle:
     cmpi.w #30,%d2
     blt.s test_near
 .ifdef ROAD_WIDE
+ .ifdef ROAD_WIDE_GEOMETRY
+    moveq #5,%d1
+ .else
     moveq #6,%d1
+ .endif
 .else
     moveq #8,%d1
 .endif
@@ -94,7 +123,11 @@ test_near:
     cmpi.w #15,%d2
     blt.s scale_ready
 .ifdef ROAD_WIDE
+ .ifdef ROAD_WIDE_GEOMETRY
+    moveq #5,%d1
+ .else
     moveq #8,%d1
+ .endif
 .else
     moveq #12,%d1
 .endif
@@ -216,7 +249,11 @@ user_call:
     rts
 .even
 road_stamps:
+ .ifdef ROAD_WIDE_GEOMETRY
+    .incbin "build/perspective-road/road-wide-geometry-stamps.bin"
+ .else
     .incbin "build/perspective-road/road-stamps.bin"
+ .endif
 road_curve_sine:
     .incbin "build/perspective-road/road-curve-sine.bin"
 road_curve_sine_end:
