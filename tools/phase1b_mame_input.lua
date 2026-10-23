@@ -30,6 +30,9 @@ end
 local source_output = os.getenv("PDRIFT_SOURCE_DIR")
 local source_override = os.getenv("PDRIFT_SOURCE_OVERRIDE")
 local source_override_frame = tonumber(os.getenv("PDRIFT_SOURCE_OVERRIDE_FRAME") or "966")
+local capture_profile = os.getenv("PDRIFT_CAPTURE_PROFILE") or "full"
+assert(capture_profile == "full" or capture_profile == "road-edge")
+assert(capture_profile ~= "road-edge" or (source_output and source_override))
 assert(source_override_frame and source_override_frame >= 960
   and source_override_frame <= sequence_end)
 local source_override_range = os.getenv("PDRIFT_SOURCE_OVERRIDE_RANGE")
@@ -232,6 +235,7 @@ print("INPUT_SCHEDULE=coin60-64,start130-134,pedal240+,steer128")
 print("STEER_PULSE=" .. tostring(steer_pulse))
 print("STEER_RETURN=" .. steer_return)
 print("RAM_PROFILE=" .. ram_profile)
+print("CAPTURE_PROFILE=" .. capture_profile)
 emu.register_frame_done(function()
   if not state_ready then return end
   frames = frames + 1
@@ -694,9 +698,13 @@ emu.register_frame_done(function()
     capture_rotate(frames)
   end
   if source_output and frames >= 960 and frames <= sequence_end then
-    capture_source(frames, "ysprites", source_x_space, 0x180000, 0x10000)
-    capture_source(frames, "bsprites", source_y_space, 0x188000, 0x1000)
-    capture_source(frames, "palette", source_y_space, 0x190000, 0x4000)
+    if capture_profile == "full" or frames == source_override_frame then
+      capture_source(frames, "ysprites", source_x_space, 0x180000, 0x10000)
+    end
+    if capture_profile == "full" then
+      capture_source(frames, "bsprites", source_y_space, 0x188000, 0x1000)
+      capture_source(frames, "palette", source_y_space, 0x190000, 0x4000)
+    end
   end
   if source_override and frames == source_override_frame then
     local file = assert(io.open(source_override, "rb"))

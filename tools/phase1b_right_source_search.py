@@ -32,7 +32,8 @@ def case_name(start, size, exact_slots):
     return name
 
 
-def run(root, mame, rompath, state, groups, callback, exact_slots):
+def run(root, mame, rompath, state, groups, callback, exact_slots,
+        capture_profile="full"):
     baseline = root / "phase1b-mild-steer-112"
     original = (baseline / f"source-{callback:04d}-ysprites.bin").read_bytes()
     assert len(original) == 0x10000
@@ -55,6 +56,7 @@ def run(root, mame, rompath, state, groups, callback, exact_slots):
         env = os.environ.copy()
         env.update({"SDL_VIDEODRIVER": "dummy", "PDRIFT_SNAPSHOT_DIR": ".",
                     "PDRIFT_SWAP_DIR": ".", "PDRIFT_SOURCE_DIR": ".",
+                    "PDRIFT_CAPTURE_PROFILE": capture_profile,
                     "PDRIFT_SEQUENCE_END_FRAME": "976",
                     "PDRIFT_STATE_LOAD": str(state.resolve()),
                     "PDRIFT_STEER_PULSE": str(PULSE),
@@ -126,6 +128,8 @@ if __name__ == "__main__":
     parser.add_argument("--groups", nargs="+", help="hex START:SIZE pairs")
     parser.add_argument("--callback", type=int, default=DEFAULT_CALLBACK)
     parser.add_argument("--exact-slots", nargs="+", help="hide only these hex slots")
+    parser.add_argument("--capture-profile", choices=("full", "road-edge"),
+                        default="full", help="source capture volume; default keeps all dumps")
     args = parser.parse_args()
     root = args.private_root.resolve()
     exact_slots = tuple(sorted(int(item, 16) for item in args.exact_slots)) if args.exact_slots else ()
@@ -141,6 +145,6 @@ if __name__ == "__main__":
     if args.action == "run":
         assert args.mame and args.rompath and args.state
         run(root, args.mame, args.rompath, args.state, groups, args.callback,
-            exact_slots)
+            exact_slots, args.capture_profile)
     else:
         analyze(root, groups, args.callback, exact_slots)
