@@ -513,7 +513,11 @@ road_sums:
 .ifdef ROAD_LIVE_CAMERA
 .ifdef ROAD_WIDE
  .ifdef ROAD_WIDE_GEOMETRY
+  .ifdef ROAD_WIDE_MOTION
+    .include "build/perspective-road/road-wide-motion-sums.inc"
+  .else
     .include "build/perspective-road/road-wide-geometry-sums.inc"
+  .endif
  .else
     .include "build/perspective-road/road-live-camera-wide-sums.inc"
  .endif
@@ -534,7 +538,11 @@ road_sums:
 .endif
 .ifdef ROAD_LIVE_CAMERA
 road_live_camera_packets:
+ .ifdef ROAD_WIDE_MOTION
+    .incbin "build/perspective-road/road-wide-motion-packets.bin"
+ .else
     .incbin "build/perspective-road/road-live-camera-packets.bin"
+ .endif
 .endif
 .ifdef ROAD_COMPARE
 label_pre:

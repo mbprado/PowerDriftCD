@@ -1,0 +1,28 @@
+{
+  "checks": [
+    {
+      "capture": "intermediate",
+      "reference_packets": [
+        15,
+        16
+      ],
+      "output_row": 28,
+      "left": 26,
+      "right": 118,
+      "width": 93,
+      "png_sha256": "b3529b366a5f57cc2a696c873a4b435f69d451402d251262f7c047015f222659"
+    },
+    {
+      "capture": "final",
+      "reference_packets": [
+        59
+      ],
+      "output_row": 28,
+      "left": 12,
+      "right": 103,
+      "width": 92,
+      "png_sha256": "8e58e6cd5c56eb9cc079c91d76e801c3c3a850ee36dc0ebfbf8d15fa65bcd337"
+    }
+  ],
+  "changed_viewport_pixels": 2607
+}

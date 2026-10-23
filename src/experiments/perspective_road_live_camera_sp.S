@@ -37,7 +37,11 @@ wait_sub:
     lea road_stamps(%pc),%a0
     lea 0x080000,%a1
  .ifdef ROAD_WIDE_GEOMETRY
+  .ifdef ROAD_WIDE_MOTION
+    move.w #1087,%d0
+  .else
     move.w #447,%d0
+  .endif
  .else
     move.w #191,%d0
  .endif
@@ -48,12 +52,39 @@ copy_stamps:
     move.w #255,%d0
 grass_map:
  .ifdef ROAD_WIDE_GEOMETRY
+  .ifdef ROAD_WIDE_MOTION
+    move.w #16,(%a1)+
+  .else
     move.w #6,(%a1)+
+  .endif
  .else
     move.w #2,(%a1)+
  .endif
     dbf %d0,grass_map
  .ifdef ROAD_WIDE_GEOMETRY
+  .ifdef ROAD_WIDE_MOTION
+    lea 0x0a000c,%a1 /* five road columns, three width variants */
+    move.w #15,%d6
+    moveq #1,%d4
+motion_road_map:
+    move.w %d4,%d0
+    move.w %d0,(%a1)+
+    addq.w #1,%d0
+    move.w %d0,(%a1)+
+    addq.w #1,%d0
+    move.w %d0,(%a1)+
+    addq.w #1,%d0
+    move.w %d0,(%a1)+
+    addq.w #1,%d0
+    move.w %d0,(%a1)
+    adda.w #24,%a1
+    addq.w #5,%d4
+    cmpi.w #16,%d4
+    blt.s motion_map_width_ready
+    moveq #1,%d4
+motion_map_width_ready:
+    dbf %d6,motion_road_map
+  .else
     lea 0x0a000c,%a1 /* five road stamps occupy columns 6..10 */
     move.w #15,%d0
 wide_road_map:
@@ -64,6 +95,7 @@ wide_road_map:
     move.w #5,(%a1)
     adda.w #24,%a1
     dbf %d0,wide_road_map
+  .endif
  .else
     lea 0x0a0010,%a1 /* road occupies source-map column 8 */
     move.w #15,%d0
@@ -250,7 +282,11 @@ user_call:
 .even
 road_stamps:
  .ifdef ROAD_WIDE_GEOMETRY
+  .ifdef ROAD_WIDE_MOTION
+    .incbin "build/perspective-road/road-wide-motion-stamps.bin"
+  .else
     .incbin "build/perspective-road/road-wide-geometry-stamps.bin"
+  .endif
  .else
     .incbin "build/perspective-road/road-stamps.bin"
  .endif

@@ -1,12 +1,12 @@
 #!/bin/sh
 set -eu
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-    echo "usage: sh scripts/build-perspective-road.sh LOCAL_US_STARTUP_PREFIX [precomputed|runtime|runtime-combined|compare|runtime-full|runtime-independent|runtime-live|runtime-live-wide|runtime-live-wide-naive|runtime-live-wide-geometry]" >&2
+    echo "usage: sh scripts/build-perspective-road.sh LOCAL_US_STARTUP_PREFIX [precomputed|runtime|runtime-combined|compare|runtime-full|runtime-independent|runtime-live|runtime-live-wide|runtime-live-wide-naive|runtime-live-wide-geometry|runtime-live-wide-motion]" >&2
     exit 2
 fi
 prefix=$1
 mode=${2:-precomputed}
-if [ "$mode" != precomputed ] && [ "$mode" != runtime ] && [ "$mode" != runtime-combined ] && [ "$mode" != compare ] && [ "$mode" != runtime-full ] && [ "$mode" != runtime-independent ] && [ "$mode" != runtime-live ] && [ "$mode" != runtime-live-wide ] && [ "$mode" != runtime-live-wide-naive ] && [ "$mode" != runtime-live-wide-geometry ]; then
+if [ "$mode" != precomputed ] && [ "$mode" != runtime ] && [ "$mode" != runtime-combined ] && [ "$mode" != compare ] && [ "$mode" != runtime-full ] && [ "$mode" != runtime-independent ] && [ "$mode" != runtime-live ] && [ "$mode" != runtime-live-wide ] && [ "$mode" != runtime-live-wide-naive ] && [ "$mode" != runtime-live-wide-geometry ] && [ "$mode" != runtime-live-wide-motion ]; then
     echo "unknown trace mode: $mode" >&2
     exit 2
 fi
@@ -17,9 +17,12 @@ if [ ! -f "$prefix" ]; then
 fi
 mkdir -p build/perspective-road build/graphics-asic-bench build/private
 python3 tools/make_perspective_road.py build/perspective-road
+if [ "$mode" = runtime-live-wide-motion ]; then
+    python3 tools/make_wide_road_motion.py build/perspective-road
+fi
 python3 tools/make_graphics_asic_bench.py build/graphics-asic-bench
 sp_source=src/experiments/perspective_road_sp.S
-if [ "$mode" = runtime ] || [ "$mode" = runtime-combined ] || [ "$mode" = compare ] || [ "$mode" = runtime-full ] || [ "$mode" = runtime-independent ] || [ "$mode" = runtime-live ] || [ "$mode" = runtime-live-wide ] || [ "$mode" = runtime-live-wide-naive ] || [ "$mode" = runtime-live-wide-geometry ]; then
+if [ "$mode" = runtime ] || [ "$mode" = runtime-combined ] || [ "$mode" = compare ] || [ "$mode" = runtime-full ] || [ "$mode" = runtime-independent ] || [ "$mode" = runtime-live ] || [ "$mode" = runtime-live-wide ] || [ "$mode" = runtime-live-wide-naive ] || [ "$mode" = runtime-live-wide-geometry ] || [ "$mode" = runtime-live-wide-motion ]; then
     runtime_ip=--defsym=ROAD_RUNTIME=1
     runtime_sp=--defsym=RUNTIME_TRACE=1
     image_name=perspective-road-runtime-us
@@ -44,21 +47,26 @@ if [ "$mode" = runtime ] || [ "$mode" = runtime-combined ] || [ "$mode" = compar
         sp_source=src/experiments/perspective_road_independent_sp.S
         image_name=perspective-road-runtime-independent-us
     fi
-    if [ "$mode" = runtime-live ] || [ "$mode" = runtime-live-wide ] || [ "$mode" = runtime-live-wide-naive ] || [ "$mode" = runtime-live-wide-geometry ]; then
+    if [ "$mode" = runtime-live ] || [ "$mode" = runtime-live-wide ] || [ "$mode" = runtime-live-wide-naive ] || [ "$mode" = runtime-live-wide-geometry ] || [ "$mode" = runtime-live-wide-motion ]; then
         runtime_ip='--defsym=ROAD_RUNTIME=1 --defsym=ROAD_RUNTIME_COMBINED=1 --defsym=ROAD_LIVE_CAMERA=1'
         runtime_sp=
         sp_source=src/experiments/perspective_road_live_camera_sp.S
         image_name=perspective-road-runtime-live-us
-        if [ "$mode" = runtime-live-wide ] || [ "$mode" = runtime-live-wide-naive ] || [ "$mode" = runtime-live-wide-geometry ]; then
+        if [ "$mode" = runtime-live-wide ] || [ "$mode" = runtime-live-wide-naive ] || [ "$mode" = runtime-live-wide-geometry ] || [ "$mode" = runtime-live-wide-motion ]; then
             runtime_ip="$runtime_ip --defsym=ROAD_WIDE=1"
             runtime_sp=--defsym=ROAD_WIDE=1
             image_name=perspective-road-runtime-live-wide-us
-            if [ "$mode" = runtime-live-wide ] || [ "$mode" = runtime-live-wide-geometry ]; then
+            if [ "$mode" = runtime-live-wide ] || [ "$mode" = runtime-live-wide-geometry ] || [ "$mode" = runtime-live-wide-motion ]; then
                 runtime_ip="$runtime_ip --defsym=ROAD_ADAPTIVE_PACING=1"
-                if [ "$mode" = runtime-live-wide-geometry ]; then
+                if [ "$mode" = runtime-live-wide-geometry ] || [ "$mode" = runtime-live-wide-motion ]; then
                     runtime_ip="$runtime_ip --defsym=ROAD_WIDE_GEOMETRY=1"
                     runtime_sp="$runtime_sp --defsym=ROAD_WIDE_GEOMETRY=1"
                     image_name=perspective-road-runtime-live-wide-geometry-us
+                    if [ "$mode" = runtime-live-wide-motion ]; then
+                        runtime_ip="$runtime_ip --defsym=ROAD_WIDE_MOTION=1"
+                        runtime_sp="$runtime_sp --defsym=ROAD_WIDE_MOTION=1"
+                        image_name=perspective-road-runtime-live-wide-motion-us
+                    fi
                 fi
             else
                 image_name=perspective-road-runtime-live-wide-naive-us

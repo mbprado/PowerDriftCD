@@ -196,9 +196,9 @@ def wide_live_camera_lines(frame):
     return live_camera_lines(frame, width=128)
 
 
-def wide_geometry_lines(frame):
+def wide_geometry_lines(frame, packet_fn=live_camera_packet):
     """Isolated wider-stamp test; five camera words remain unchanged."""
-    curve_phase, ridge_phase, bank, horizon, texture_phase = live_camera_packet(frame)
+    curve_phase, ridge_phase, bank, horizon, texture_phase = packet_fn(frame)
     for y in range(SIZE):
         depth = max(0, y - horizon)
         dx_eighth = (10, 5, 5, 4)[min(3, depth // 15)]
