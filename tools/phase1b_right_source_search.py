@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 
 from phase1b_mild_steer_width import digest, scan
+from phase1b_evidence_cache import private_rom_inputs, replay
 from phase1b_swap_compare import png_rows
 
 
@@ -33,11 +34,16 @@ def case_name(start, size, exact_slots):
 
 
 def run(root, mame, rompath, state, groups, callback, exact_slots,
-        capture_profile="full"):
+        capture_profile="full", reuse_cache=False):
     baseline = root / "phase1b-mild-steer-112"
     original = (baseline / f"source-{callback:04d}-ysprites.bin").read_bytes()
     assert len(original) == 0x10000
     script = Path(__file__).resolve().with_name("phase1b_mame_input.lua")
+    if reuse_cache:
+        private = Path(__file__).resolve().parents[1] / "build/private"
+        assert root.is_relative_to(private), "cache outputs must stay in build/private"
+        rom_manifest = private / "phase1b-rom-manifest.txt"
+        rom_inputs = private_rom_inputs(rom_manifest, rompath)
     for start, size in groups:
         name = case_name(start, size, exact_slots)
         raw = bytearray(original)
@@ -52,7 +58,8 @@ def run(root, mame, rompath, state, groups, callback, exact_slots,
         override = root / f"{trial_name(callback, name)}-source.bin"
         override.write_bytes(raw)
         trial = root / trial_name(callback, name)
-        trial.mkdir(parents=True, exist_ok=True)
+        if not reuse_cache:
+            trial.mkdir(parents=True, exist_ok=True)
         env = os.environ.copy()
         env.update({"SDL_VIDEODRIVER": "dummy", "PDRIFT_SNAPSHOT_DIR": ".",
                     "PDRIFT_SWAP_DIR": ".", "PDRIFT_SOURCE_DIR": ".",
@@ -67,10 +74,29 @@ def run(root, mame, rompath, state, groups, callback, exact_slots,
                "-noreadconfig", "-video", "none", "-sound", "none",
                "-nothrottle", "-seconds_to_run", "18", "-autoboot_script",
                str(script)]
-        with (trial / "phase1b-input.log").open("w") as log:
-            subprocess.run(cmd, cwd=trial, env=env, stdout=log,
-                           stderr=subprocess.STDOUT, check=True)
-        print(name, "hidden slots", len(slots), "replay complete", flush=True)
+        if reuse_cache:
+            inputs = [("mame", mame.resolve(), None),
+                      ("lua", script, None), ("state", state.resolve(), None),
+                      ("source_search_tool", Path(__file__).resolve(), None),
+                      ("evidence_cache_tool", Path(__file__).resolve().with_name(
+                          "phase1b_evidence_cache.py"), None),
+                      ("rom_manifest", rom_manifest, None),
+                      ("source_before", baseline / f"source-{callback:04d}-ysprites.bin", None),
+                      ("override", override, None)] + rom_inputs
+            required = [f"swap-screen-{frame:04d}.png"
+                        for frame in range(960, callback + 2)]
+            required.extend((f"source-{callback:04d}-ysprites.bin",
+                             f"source-{callback:04d}-ysprites-after.bin",
+                             "phase1b-input.log"))
+            status, key = replay(root / "phase1b-evidence-cache", trial,
+                                 cmd, env, inputs, required)
+            print(name, "hidden slots", len(slots), status,
+                  "evidence key", key, flush=True)
+        else:
+            with (trial / "phase1b-input.log").open("w") as log:
+                subprocess.run(cmd, cwd=trial, env=env, stdout=log,
+                               stderr=subprocess.STDOUT, check=True)
+            print(name, "hidden slots", len(slots), "replay complete", flush=True)
 
 
 def analyze(root, groups, callback, exact_slots):
@@ -130,6 +156,8 @@ if __name__ == "__main__":
     parser.add_argument("--exact-slots", nargs="+", help="hide only these hex slots")
     parser.add_argument("--capture-profile", choices=("full", "road-edge"),
                         default="full", help="source capture volume; default keeps all dumps")
+    parser.add_argument("--reuse-cache", action="store_true",
+                        help="reuse only a fully verified exact trial; normal runs always execute")
     args = parser.parse_args()
     root = args.private_root.resolve()
     exact_slots = tuple(sorted(int(item, 16) for item in args.exact_slots)) if args.exact_slots else ()
@@ -145,6 +173,6 @@ if __name__ == "__main__":
     if args.action == "run":
         assert args.mame and args.rompath and args.state
         run(root, args.mame, args.rompath, args.state, groups, args.callback,
-            exact_slots, args.capture_profile)
+            exact_slots, args.capture_profile, args.reuse_cache)
     else:
         analyze(root, groups, args.callback, exact_slots)
