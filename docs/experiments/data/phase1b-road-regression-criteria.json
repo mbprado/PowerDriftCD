@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "scope": "retrospective_host_geometry_guardrails_not_hardware_acceptance",
+  "calibration_path": "docs/experiments/data/phase1b-road-calibration.json",
+  "calibration_sha256": "e41b944cab9a2940ec65a0f660e1bcd4db78fa8303ab02b5e67c4d630f79da23",
+  "cases_path": "docs/experiments/data/phase1b-road-geometry-cases.json",
+  "cases_sha256": "1f02ea614ddda93a97f29de33c4f8cb3b153251b3b2bc7643d1654ea179d1b2e",
+  "role_limits": {
+    "fit": {"min_rows": 3, "max_mean_edge": 1.0, "max_mean_width": 2.0},
+    "adaptation": {"min_rows": 3, "max_mean_edge": 1.0, "max_mean_width": 2.0},
+    "check": {"min_rows": 3, "max_mean_edge": 2.0, "max_mean_width": 2.0}
+  },
+  "cases": [
+    {
+      "id": "screen971_baseline",
+      "evidence_sha256": "5a3c30c7f4cef6f705c610835dc5146049ae69c09b08af5bf911beb56c5b3db1",
+      "baseline_metrics": {
+        "fit": {"count": 3, "mean_absolute_edge_error": 0.833333, "mean_absolute_width_error": 1.666667}
+      }
+    },
+    {
+      "id": "screen973_baseline",
+      "evidence_sha256": "8503501d9ff715de42e77d3d304d8796a965b62bf502548e8cf79c1098149944",
+      "baseline_metrics": {
+        "fit": {"count": 3, "mean_absolute_edge_error": 0.333333, "mean_absolute_width_error": 0.666667}
+      }
+    },
+    {
+      "id": "screen975_baseline",
+      "evidence_sha256": "b40990c092e218cec764ebf3ae78586b5aa52970dd75644a1b6da797bfa1f1f0",
+      "baseline_metrics": {
+        "fit": {"count": 3, "mean_absolute_edge_error": 0.5, "mean_absolute_width_error": 1.0},
+        "check": {"count": 3, "mean_absolute_edge_error": 1.833333, "mean_absolute_width_error": 3.666667}
+      }
+    },
+    {
+      "id": "screen975_local_width_bump",
+      "evidence_sha256": "b40990c092e218cec764ebf3ae78586b5aa52970dd75644a1b6da797bfa1f1f0",
+      "baseline_metrics": {
+        "fit": {"count": 3, "mean_absolute_edge_error": 0.5, "mean_absolute_width_error": 1.0},
+        "adaptation": {"count": 3, "mean_absolute_edge_error": 0.833333, "mean_absolute_width_error": 1.0}
+      }
+    }
+  ]
+}
