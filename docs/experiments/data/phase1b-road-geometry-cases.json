@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "screen971_baseline",
+      "screen_frame": 971,
+      "evidence": "phase1b-right-search-E630-00040-only-E630-E660.json",
+      "evidence_rows": "records[0].rows",
+      "host_image": "phase1b-road-width-profile-preview/original-road-971.png",
+      "camera_packet": [63, 0, 0, 4, 42],
+      "rows": {"fit": [154, 155, 156]}
+    },
+    {
+      "id": "screen973_baseline",
+      "screen_frame": 973,
+      "evidence": "phase1b-right-search-972-A600-00040-only-A600-A630.json",
+      "evidence_rows": "records[0].rows",
+      "host_image": "phase1b-road-width-profile-preview/original-road-973.png",
+      "camera_packet": [38, 0, 0, 4, 15],
+      "rows": {"fit": [154, 155, 156]}
+    },
+    {
+      "id": "screen975_baseline",
+      "screen_frame": 975,
+      "evidence": "phase1b-mild-steer-112-hide.json",
+      "evidence_rows": "measurements",
+      "host_image": "phase1b-road-width-profile-preview/original-road-975.png",
+      "camera_packet": [38, 0, 0, 4, 31],
+      "rows": {"fit": [154, 155, 156], "check": [157, 158, 159]}
+    },
+    {
+      "id": "screen975_local_width_bump",
+      "screen_frame": 975,
+      "evidence": "phase1b-mild-steer-112-hide.json",
+      "evidence_rows": "measurements",
+      "host_image": "phase1b-road-vertical-profile/changed-975.png",
+      "camera_packet": [38, 0, 0, 4, 31],
+      "rows": {"fit": [154, 155, 156], "adaptation": [157, 158, 159]}
+    }
+  ]
+}

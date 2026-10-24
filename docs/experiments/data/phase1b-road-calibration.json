@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "status": "project_design_choice_not_recovered_arcade_projection",
+  "arcade_screen": [320, 224],
+  "output_image": [128, 64],
+  "arcade_y_crop_inclusive": [134, 190],
+  "output_row_rounding": "nearest_even",
+  "arcade_x_at_output_pixel_center": {
+    "x_multiplier": 10,
+    "offset": 3,
+    "denominator": 4
+  },
+  "host_road_rgb": [[96, 97, 99], [188, 42, 35], [239, 220, 92], [232, 221, 201]],
+  "edge_membership": "inclusive_arcade_left_and_right"
+}
