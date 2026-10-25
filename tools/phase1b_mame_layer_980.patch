@@ -16,9 +16,9 @@ diff --git a/src/mame/sega/segaybd.cpp b/src/mame/sega/segaybd.cpp
 +	if (probe)
 +		for (int i = 0; i < 12; ++i)
 +		{
-+			rotated_probe[i] = bitmap.pix(probe_y[i])[probe_x[i]];
-+			sprite_probe[i] = m_bsprites->bitmap().pix(probe_y[i])[probe_x[i]];
-+			priority_probe[i] = screen.priority().pix(probe_y[i])[probe_x[i]];
++			rotated_probe[i] = bitmap.pix(probe_y[i], probe_x[i]);
++			sprite_probe[i] = m_bsprites->bitmap().pix(probe_y[i], probe_x[i]);
++			priority_probe[i] = screen.priority().pix(probe_y[i], probe_x[i]);
 +		}
  
  	// mix in 16B sprites
@@ -37,7 +37,7 @@ diff --git a/src/mame/sega/segaybd.cpp b/src/mame/sega/segaybd.cpp
 +		for (int i = 0; i < 12; ++i)
 +			std::fprintf(out, "%d,%d,%u,%u,%u,%u\n", probe_x[i], probe_y[i],
 +				unsigned(rotated_probe[i]), unsigned(sprite_probe[i]),
-+				unsigned(priority_probe[i]), unsigned(bitmap.pix(probe_y[i])[probe_x[i]]));
++				unsigned(priority_probe[i]), unsigned(bitmap.pix(probe_y[i], probe_x[i])));
 +		if (std::fclose(out))
 +			fatalerror("Cannot close layer probe: %s", path);
 +	}
