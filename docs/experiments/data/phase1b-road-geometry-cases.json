@@ -36,6 +36,24 @@
       "host_image": "phase1b-road-vertical-profile/changed-975.png",
       "camera_packet": [38, 0, 0, 4, 31],
       "rows": {"fit": [154, 155, 156], "adaptation": [157, 158, 159]}
+    },
+    {
+      "id": "screen967_baseline",
+      "screen_frame": 967,
+      "evidence": "phase1b-right-search-966-E630-00040-only-E630-E650-E660.json",
+      "evidence_rows": "records[0].rows",
+      "host_image": "phase1b-screen967-holdout/baseline.png",
+      "camera_packet": [38, 0, 0, 4, 31],
+      "rows": {"fit": [154, 155, 156], "check": [153, 157, 158, 159, 160, 161, 162, 163]}
+    },
+    {
+      "id": "screen967_width_bump",
+      "screen_frame": 967,
+      "evidence": "phase1b-right-search-966-E630-00040-only-E630-E650-E660.json",
+      "evidence_rows": "records[0].rows",
+      "host_image": "phase1b-screen967-holdout/width-bump.png",
+      "camera_packet": [38, 0, 0, 4, 31],
+      "rows": {"fit": [154, 155, 156], "check": [153, 157, 158, 159, 160, 161, 162, 163]}
     }
   ]
 }

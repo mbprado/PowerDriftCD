@@ -35,3 +35,5 @@ shasum -a 256 build/private/phase1b-road-regression.json
 ```
 
 **Limitations — inference from verified execution:** the current independent-check failure is a useful unresolved shape constraint, while the adaptation result cannot establish generalization. The next research experiment should collect another causally verified vertical road span under a different arcade update, then add its host image as a new `check` case. The runner will need its criteria updated deliberately for a new case or calibration. None of these statuses claims a moving curved road will fit stock Sega CD timing or visual limits.
+
+**Subsequent evidence — verified by execution:** the [screen-967 independent span](2026-10-24-screen967-independent-road-span.md) later added two cases and updated the retrospective criteria. The four-case statuses, hashes and timing above belong to the original checker milestone at commit `d028abe`; running the current case and criteria files yields a six-case report with independent decision `FAIL` for both new variants.

@@ -4,7 +4,7 @@
   "calibration_path": "docs/experiments/data/phase1b-road-calibration.json",
   "calibration_sha256": "e41b944cab9a2940ec65a0f660e1bcd4db78fa8303ab02b5e67c4d630f79da23",
   "cases_path": "docs/experiments/data/phase1b-road-geometry-cases.json",
-  "cases_sha256": "1f02ea614ddda93a97f29de33c4f8cb3b153251b3b2bc7643d1654ea179d1b2e",
+  "cases_sha256": "486f5889931f4b6f1ee5fe06fb17a3aa44c4ec94624c18e06a2931c3b660c79e",
   "role_limits": {
     "fit": {"min_rows": 3, "max_mean_edge": 1.0, "max_mean_width": 2.0},
     "adaptation": {"min_rows": 3, "max_mean_edge": 1.0, "max_mean_width": 2.0},
@@ -39,6 +39,22 @@
       "baseline_metrics": {
         "fit": {"count": 3, "mean_absolute_edge_error": 0.5, "mean_absolute_width_error": 1.0},
         "adaptation": {"count": 3, "mean_absolute_edge_error": 0.833333, "mean_absolute_width_error": 1.0}
+      }
+    },
+    {
+      "id": "screen967_baseline",
+      "evidence_sha256": "b68de3e28164b216ddb0bc6bd4fa04c3f1953f2f7887854af236da5a26cb526b",
+      "baseline_metrics": {
+        "fit": {"count": 3, "mean_absolute_edge_error": 0.833333, "mean_absolute_width_error": 1.666667},
+        "check": {"count": 8, "mean_absolute_edge_error": 3.125, "mean_absolute_width_error": 5.25}
+      }
+    },
+    {
+      "id": "screen967_width_bump",
+      "evidence_sha256": "b68de3e28164b216ddb0bc6bd4fa04c3f1953f2f7887854af236da5a26cb526b",
+      "baseline_metrics": {
+        "fit": {"count": 3, "mean_absolute_edge_error": 0.833333, "mean_absolute_width_error": 1.666667},
+        "check": {"count": 8, "mean_absolute_edge_error": 3.125, "mean_absolute_width_error": 4.25}
       }
     }
   ]
