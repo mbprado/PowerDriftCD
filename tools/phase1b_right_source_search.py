@@ -35,7 +35,8 @@ def case_name(start, size, exact_slots):
 
 def run(root, mame, rompath, state, groups, callback, exact_slots,
         capture_profile="full", reuse_cache=False,
-        baseline_name="phase1b-mild-steer-112"):
+        baseline_name="phase1b-mild-steer-112", capture_end=None):
+    capture_end = max(976, callback + 1) if capture_end is None else capture_end
     baseline = root / baseline_name
     original = (baseline / f"source-{callback:04d}-ysprites.bin").read_bytes()
     assert len(original) == 0x10000
@@ -65,7 +66,7 @@ def run(root, mame, rompath, state, groups, callback, exact_slots,
         env.update({"SDL_VIDEODRIVER": "dummy", "PDRIFT_SNAPSHOT_DIR": ".",
                     "PDRIFT_SWAP_DIR": ".", "PDRIFT_SOURCE_DIR": ".",
                     "PDRIFT_CAPTURE_PROFILE": capture_profile,
-                    "PDRIFT_SEQUENCE_END_FRAME": str(max(976, callback + 1)),
+                    "PDRIFT_SEQUENCE_END_FRAME": str(capture_end),
                     "PDRIFT_STATE_LOAD": str(state.resolve()),
                     "PDRIFT_STEER_PULSE": str(PULSE),
                     "PDRIFT_SOURCE_OVERRIDE_FRAME": str(callback),
@@ -85,7 +86,7 @@ def run(root, mame, rompath, state, groups, callback, exact_slots,
                       ("source_before", baseline / f"source-{callback:04d}-ysprites.bin", None),
                       ("override", override, None)] + rom_inputs
             required = [f"swap-screen-{frame:04d}.png"
-                        for frame in range(960, callback + 2)]
+                        for frame in range(960, capture_end + 1)]
             required.extend((f"source-{callback:04d}-ysprites.bin",
                              f"source-{callback:04d}-ysprites-after.bin",
                              "phase1b-input.log"))
@@ -162,6 +163,8 @@ if __name__ == "__main__":
                         help="reuse only a fully verified exact trial; normal runs always execute")
     parser.add_argument("--baseline-name", default="phase1b-mild-steer-112",
                         help="directory name under private_root holding baseline captures")
+    parser.add_argument("--capture-end", type=int,
+                        help="last composed screen to capture; default callback+1 or 976")
     args = parser.parse_args()
     root = args.private_root.resolve()
     exact_slots = tuple(sorted(int(item, 16) for item in args.exact_slots)) if args.exact_slots else ()
@@ -174,12 +177,13 @@ if __name__ == "__main__":
     assert all(start % 16 == 0 and size % 16 == 0 and size > 0
                and start + size <= 0x10000 for start, size in groups)
     assert 960 <= args.callback <= 999
+    assert args.capture_end is None or args.callback + 1 <= args.capture_end <= 1000
     assert args.baseline_name.startswith("phase1b-") and Path(args.baseline_name).name == args.baseline_name
     if args.action == "run":
         assert args.mame and args.rompath and args.state
         run(root, args.mame, args.rompath, args.state, groups, args.callback,
             exact_slots, args.capture_profile, args.reuse_cache,
-            args.baseline_name)
+            args.baseline_name, args.capture_end)
     else:
         analyze(root, groups, args.callback, exact_slots,
                 args.baseline_name)
