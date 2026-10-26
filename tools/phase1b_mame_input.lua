@@ -30,11 +30,18 @@ end
 local source_output = os.getenv("PDRIFT_SOURCE_DIR")
 local source_override = os.getenv("PDRIFT_SOURCE_OVERRIDE")
 local source_override_frame = tonumber(os.getenv("PDRIFT_SOURCE_OVERRIDE_FRAME") or "966")
+local bsprite_override = os.getenv("PDRIFT_BSPRITE_OVERRIDE")
+local bsprite_override_frame = tonumber(os.getenv("PDRIFT_BSPRITE_OVERRIDE_FRAME") or "979")
+local bsprite_override_slot = tonumber(os.getenv("PDRIFT_BSPRITE_OVERRIDE_SLOT") or "", 16)
 local capture_profile = os.getenv("PDRIFT_CAPTURE_PROFILE") or "full"
 assert(capture_profile == "full" or capture_profile == "road-edge")
-assert(capture_profile ~= "road-edge" or (source_output and source_override))
+assert(capture_profile ~= "road-edge" or (source_output and (source_override or bsprite_override)))
 assert(source_override_frame and source_override_frame >= 960
   and source_override_frame <= sequence_end)
+assert(not bsprite_override or (source_output and bsprite_override_frame
+  and bsprite_override_frame >= 960 and bsprite_override_frame <= sequence_end
+  and bsprite_override_slot and bsprite_override_slot % 16 == 0
+  and bsprite_override_slot >= 0 and bsprite_override_slot <= 0xff0))
 local source_override_range = os.getenv("PDRIFT_SOURCE_OVERRIDE_RANGE")
 local extra_screen_frame = tonumber(os.getenv("PDRIFT_EXTRA_SCREEN_FRAME") or "")
 assert(not os.getenv("PDRIFT_EXTRA_SCREEN_FRAME") or extra_screen_frame == 971)
@@ -701,8 +708,10 @@ emu.register_frame_done(function()
     if capture_profile == "full" or frames == source_override_frame then
       capture_source(frames, "ysprites", source_x_space, 0x180000, 0x10000)
     end
-    if capture_profile == "full" then
+    if capture_profile == "full" or (bsprite_override and frames == bsprite_override_frame) then
       capture_source(frames, "bsprites", source_y_space, 0x188000, 0x1000)
+    end
+    if capture_profile == "full" then
       capture_source(frames, "palette", source_y_space, 0x190000, 0x4000)
     end
   end
@@ -717,6 +726,19 @@ emu.register_frame_done(function()
     print(string.format("SOURCE_OVERRIDE,%d,ysprites,%04X,%04X,%s",
       frames, override_start, override_size, source_override))
     capture_source(frames, "ysprites-after", source_x_space, 0x180000, 0x10000)
+  end
+  if bsprite_override and frames == bsprite_override_frame then
+    local file = assert(io.open(bsprite_override, "rb"))
+    local bytes = assert(file:read("*a"))
+    assert(file:close())
+    assert(#bytes == 16)
+    for offset = 0, 15 do
+      source_y_space:write_u8(0x188000 + bsprite_override_slot + offset,
+        bytes:byte(offset + 1))
+    end
+    print(string.format("BSPRITE_OVERRIDE,%d,%03X,%s",
+      frames, bsprite_override_slot, bsprite_override))
+    capture_source(frames, "bsprites-after", source_y_space, 0x188000, 0x1000)
   end
   if state_save and frames == 950 then
     print("STATE_SAVE,950," .. state_save)
