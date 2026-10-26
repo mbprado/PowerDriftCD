@@ -64,7 +64,8 @@ end
 local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
-  or debug_mode == "projection" or debug_mode == "transform")
+  or debug_mode == "projection" or debug_mode == "transform"
+  or debug_mode == "bsprite")
 local shared_watch_address = os.getenv("PDRIFT_SHARED_WATCH_ADDR")
   and tonumber(os.getenv("PDRIFT_SHARED_WATCH_ADDR"), 16)
 local shared_watch_until = tonumber(os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or "")
@@ -122,8 +123,12 @@ local state_ready = not state_load
 local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
+  or debug_mode == "bsprite"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
+local bsprite_write_tap
+local bsprite_stage_tap
+local bsprite_write_counts = {}
 local input_breakpoints = {}
 local main_record_breakpoints = {}
 local geometry_override_word = os.getenv("PDRIFT_GEOMETRY_OVERRIDE_WORD")
@@ -140,6 +145,44 @@ assert(not os.getenv("PDRIFT_PROJECTION_GLOBAL_X_DELTA") or
 if debug_watch then
   assert(manager.machine.debugger)
   manager.machine.debugger.execution_state = "run"
+end
+if debug_mode == "bsprite" then
+  local suby = assert(manager.machine.devices[":suby"])
+  manager.machine.debugger.visible_cpu = suby
+  local space = suby.spaces["program"]
+  local initial = {}
+  for offset = 0, 14, 2 do
+    initial[#initial + 1] = string.format("%04X",
+      space:read_u16(0x188040 + offset))
+  end
+  print("BSPRITE_INITIAL," .. table.concat(initial, ","))
+  local action = 'printf "BSPRITE_WRITE pc=%06X addr=%06X data=%08X a0=%06X a1=%06X a2=%06X a3=%06X a4=%06X a5=%06X d0=%08X d1=%08X d2=%08X d3=%08X\\n",pc,wpaddr,wpdata,a0,a1,a2,a3,a4,a5,d0,d1,d2,d3;g'
+  local index = suby.debug:wpset(suby.spaces["program"], "w",
+    0x188040, 16, "1", action)
+  watchpoints[#watchpoints + 1] = { suby.debug, index }
+  print("BSPRITE_WATCH_ARMED,000,188040,16")
+  local stage_action = 'printf "BSTAGE_WRITE pc=%06X addr=%06X data=%08X a0=%06X a1=%06X a2=%06X a3=%06X a4=%06X a5=%06X d0=%08X d1=%08X d2=%08X d3=%08X\\n",pc,wpaddr,wpdata,a0,a1,a2,a3,a4,a5,d0,d1,d2,d3;g'
+  local stage_index = suby.debug:wpset(space, "w", 0x1f8630, 12,
+    "1", stage_action)
+  watchpoints[#watchpoints + 1] = { suby.debug, stage_index }
+  bsprite_stage_tap = space:install_write_tap(
+    0x1f8630, 0x1f863b, "pdrift-bsprite-stage-writes",
+    function(offset, data, mask)
+      print(string.format("BSTAGE_TAP,%d,%06X,%08X,%08X",
+        frames, offset, data, mask))
+    end)
+  print("BSTAGE_WATCH_ARMED,000,1F8630,12")
+  bsprite_write_tap = space:install_write_tap(
+    0x188000, 0x18ffff, "pdrift-bsprite-mirror-writes",
+    function(offset, data, mask)
+      local mirror = (offset >> 12) & 7
+      bsprite_write_counts[mirror] = (bsprite_write_counts[mirror] or 0) + 1
+      if (offset & 0xfff) >= 0x40 and (offset & 0xfff) <= 0x4f then
+        print(string.format("BSPRITE_TAP,%d,%06X,%08X,%08X",
+          frames, offset, data, mask))
+      end
+    end)
+  print("BSPRITE_TAP_ARMED,000,188000,8000")
 end
 local captures = { [300] = true, [600] = true, [900] = true,
                    [1020] = true, [1080] = true, [1140] = true,
@@ -246,6 +289,24 @@ print("CAPTURE_PROFILE=" .. capture_profile)
 emu.register_frame_done(function()
   if not state_ready then return end
   frames = frames + 1
+  if debug_mode == "bsprite" and frames <= 982 then
+    print(string.format("BSPRITE_FRAME,%d", frames))
+  end
+  if debug_mode == "bsprite" and frames >= 411 and frames <= 413
+      and source_output then
+    capture_source(frames, "bsource", source_y_space, 0x1f8600, 0x100)
+    capture_source(frames, "bobject", source_y_space, 0x1f8000, 0x100)
+    capture_source(frames, "bshared", source_y_space, 0x0c1500, 0x100)
+  end
+  if debug_mode == "bsprite" and frames == 413 then
+    local disasm_dir = os.getenv("PDRIFT_BSPRITE_DISASM_DIR")
+    if disasm_dir then
+      local path = disasm_dir .. "/suby-bsprite-writer.asm"
+      manager.machine.debugger:command(
+        string.format("dasm %s,13120,100,0,:suby", path))
+      print("BSPRITE_DISASM," .. path)
+    end
+  end
   if (ysprite_sequence_trace or debug_mode == "projection"
       or debug_mode == "transform") and frames >= 960 and
       frames <= ((debug_mode == "projection" or debug_mode == "transform")
@@ -258,6 +319,16 @@ emu.register_frame_done(function()
   if frames == 130 then start:set_value(1); print("INPUT,130,start-on") end
   if frames == 135 then start:set_value(0); print("INPUT,135,start-off") end
   if frames == 240 then pedal:set_value(255); print("INPUT,240,pedal1-255") end
+  if debug_mode == "bsprite" and frames == 982 then
+    for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
+    bsprite_write_tap:remove()
+    bsprite_stage_tap:remove()
+    for mirror = 0, 7 do
+      print(string.format("BSPRITE_MIRROR_COUNT,%d,%d",
+        mirror, bsprite_write_counts[mirror] or 0))
+    end
+    print("BSPRITE_WATCH_CLEARED,982")
+  end
   if steer_pulse and frames == 960 then
     steering:set_value(steer_pulse)
     print(string.format("INPUT,960,steer-%d", steer_pulse))

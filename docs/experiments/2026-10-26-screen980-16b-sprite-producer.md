@@ -1,0 +1,35 @@
+# Phase 1B: producer of the screen-980 foreground sprite — 2026-10-26
+
+## Question and acceptance
+
+**Hypothesis:** the 16B descriptor identified at [screen 980](2026-10-26-screen980-16b-sprite-record.md) is prepared by sub-CPU-Y in a staging area before it reaches display sprite RAM. **Baseline:** the three single-record hide replays proved that descriptor 4 covers `(290,157)` and `(291,158)`. **Test:** watch writes to descriptor 4 from startup, locate the first active values, then watch the corresponding staging entry and inspect the executing code. **Acceptance:** matching write values, program counters and staged/display bytes, with repeatable traces and unchanged control screenshots.
+
+## Findings
+
+**Verified by execution in isolated MAME 0.289:** sub-CPU-Y builds a 12-byte entry at local RAM `$1F8630` during the callback-411 interval. Its writes at PCs `$013170`–`$013180` produce the same first six words later found in 16B descriptor 4. During the callback-412 interval, the sub-CPU-Y routine beginning at `$0131BC` copies those 12 bytes to B-sprite RAM `$188040` through PCs `$0131C8`–`$0131CC`. The sprite device uses a 16-byte record; its last four bytes are scratch/unused by this copy. The callback-411 staging capture differs from the screen-980 descriptor, while callback-412 and callback-413 staging captures match it. The callback-979 B-sprite RAM capture contains the same first 12 bytes.
+
+**Verified by execution:** the [private disassembly](../../tools/phase1b_mame_input.lua) shows the preparation routine writing top/bottom, X, flags/pitch, graphic offset, palette/bank and zoom fields into staging RAM, followed by a separate six-word copy loop to display sprite RAM. This demonstrates a CPU-built sprite descriptor and its transfer path. The trace does **not** identify the game object or a world-track coordinate that selected it. At callback 411 the preparation code holds a local-RAM pointer in A0 and a ROM-table pointer in A1; interpreting their upstream structure remains **unsupported**.
+
+**Verified by execution and visual comparison of the private baseline/hide screenshots:** hiding descriptor 4 removes a tall, narrow foreground structure on the right of screen 980, with changed pixels confined to x=259–291 and y=57–175. The two sampled dark pixels are part of that foreground structure; the rotation-fill color appears when it is hidden. **Inference:** the boundary detector encountered 16B foreground occlusion at these rows. The exact in-game name or purpose of the object is **unsupported**. These two samples must remain in raw screen observations but must not be used as unoccluded road-width targets. The Y-sprite-derived `(297,159)` sample retains its separate provenance. The forward five-word camera packet test remains `INCONCLUSIVE`; no Sega CD renderer or camera-interface change follows from this result.
+
+## Controls and limitations
+
+**Verified by execution:** two independent 8-second startup replays recorded 576 staging writes and 1,418 writes to descriptor 4 through callback 479. Their ordered staging and descriptor write streams match exactly, and both frame-300 PNGs have SHA-256 `76b9bafab60876d676fdf445c8e06e49262f87b1e98d7040fe9dcd72532a135a`. A third replay without the staging watch has the identical descriptor write stream and frame-300 PNG. The [audit script](../../tools/phase1b_bsprite_producer_audit.py) checks event ordering, write addresses/data, sub-CPU-Y PCs, callback-411 staging construction, callback-412 display copy and the callback-979 baseline descriptor. Its private JSON result is `build/private/phase1b-bsprite980-producer-audit.json` (SHA-256 `2b82f5ed68fad45082fa7534ae14af0ce1a8a362cbf26a0030bdc68343f8601b`).
+
+**Verified by execution:** an initial debugger trace had the write watch on sub-CPU-Y while the debugger's visible CPU remained main CPU. Its address/data stream was valid, but its PC/register labels were not. The final trace explicitly selects sub-CPU-Y before registering watchpoints; both its write tap and debugger log agree on every checked write. The earlier misleading PC labels are excluded from the audit and findings. The MAME disassembly is retained only under ignored `build/private/`.
+
+**Documented only in pinned [MAME Y-Board driver](https://github.com/mamedev/mame/blob/mame0289/src/mame/sega/segaybd.cpp) and [16B sprite device](https://github.com/mamedev/mame/blob/mame0289/src/mame/sega/sega16sp.cpp):** sub-CPU-Y maps local RAM and B-sprite RAM; the sprite renderer consumes the 16-byte descriptors. This result concerns MAME's modeled arcade execution. No independent arcade emulator, physical Y-Board, BlastEm, or Sega CD hardware run was performed. No arcade or Sega CD cycle cost was measured; MAME host-speed output is not hardware-performance evidence.
+
+## Reproduction
+
+**Verified by execution:** source base `22096a5` on `experiment/perspective-road`; macOS Darwin 25.6.0 x86_64; Python 3.14.8; isolated MAME 0.289 source revision `f34f02505e32c1993c6a782b6814232cbfc74e36`; executable SHA-256 `690c57de086c2cdf069e0290564c241cceb8ff53101832cf760ac909d4270766`. The owner-local 53-file ROM manifest SHA-256 is `b8894130f0d4081fb193fe675acd45f7ded2e0f3572a0d23560e9ebb969c6f2f`. The Lua tracer SHA-256 is `a2c452d38f391d18386e43b6646ee7a0d041692529d66cbd969608ad441ac5c1`; producer audit SHA-256 `1df8c0d7e25e19bbfd35ac6d822f5162c28e080aaf8c01a56b0add9056343b8b`.
+
+From each ignored replay directory (`build/private/phase1b-bsprite980-producer-final/` and `-r2/`), run the isolated MAME executable with `pdrift -rompath <absolute build/private/phase1b-roms> -noreadconfig -video none -sound none -nothrottle -seconds_to_run 8 -debug -debugger none -debuglog -autoboot_script <absolute tools/phase1b_mame_input.lua>`. Set `SDL_VIDEODRIVER=dummy`, `PDRIFT_SNAPSHOT_DIR=.`, `PDRIFT_SOURCE_DIR=.`, `PDRIFT_DEBUG_WATCH=bsprite`, `PDRIFT_BSPRITE_DISASM_DIR=.` and `PDRIFT_STEER_PULSE=112`; redirect output to `phase1b-input.log`. The comparison replay at `build/private/phase1b-bsprite980-stage-writer/` used the same inputs and an earlier tracer revision with the same write instrumentation. Audit with:
+
+```sh
+python3 tools/phase1b_bsprite_producer_audit.py build/private/phase1b-layer980/baseline/source-0979-bsprites.bin build/private/phase1b-bsprite980-stage-writer build/private/phase1b-bsprite980-producer-final build/private/phase1b-bsprite980-producer-final-r2
+```
+
+The private disassembly SHA-256 is `be417049c48910202a775988fba3d4dc006d5a4843f6032a4886948a27a205a1`; callback-412 staging capture SHA-256 `ce206dcddf0b7a4646918483e124b2fe291e571fb410601477df39059101e66a`. No ROM, extracted commercial graphic, raw trace, saved state or screenshot is tracked.
+
+**Next test — hypothesis:** measure a road-only Y-sprite contour across adjacent callbacks with explicit exclusion of pixels covered by the 16B layer, then compare that calibrated contour with the existing Sega CD camera packet. Preserve the prior mixed-layer screen observations as an independent display-level reference.
