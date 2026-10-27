@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "screen981_three_slot_exploratory",
+      "screen_frame": 981,
+      "evidence": "phase1b-right-search-980-A4A0-00190-only-A4A0-A5D0-A620.json",
+      "evidence_rows": "records[0].rows",
+      "host_image": "phase1b-road-width-profile-preview/original-road-975.png",
+      "camera_packet": [38, 0, 0, 4, 31],
+      "rows": {"check": [157, 158, 159, 160, 161, 162, 163]}
+    }
+  ]
+}
