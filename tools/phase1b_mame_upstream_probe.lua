@@ -12,7 +12,10 @@ assert(mode == "table_boot" or mode == "state_inputs" or
        mode == "state7c_targets" or mode == "state7c_carry_inputs" or
        mode == "state7c_carry_targets" or mode == "state24_writes" or
        mode == "state24_inputs" or mode == "state24_targets" or
-       mode == "state24_order")
+       mode == "state24_order" or mode == "state24_source_dev" or
+       mode == "state24_source_inputs" or mode == "state24_source_targets" or
+       mode == "state24_forward_inputs" or mode == "state24_forward_targets" or
+       mode == "state24_forward_order")
 local cpu = assert(manager.machine.devices[":maincpu"])
 local space = assert(cpu.spaces["program"])
 local debugger = assert(cpu.debug)
@@ -172,6 +175,40 @@ emu.register_frame_done(function()
           debugger:bpset(pc, "a5==c0840",
             'printf "STATE24_PC pc=%06X\\n",pc;g')
       end
+    elseif mode == "state24_source_dev" then
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x343c4, "a5==c0840",
+        'printf "STATE24_SOURCE pc=%06X flag26=%02X flag54=%02X flag55=%02X flag47=%02X word80=%04X word8c=%04X flag69=%02X flag5e=%02X word8e=%04X oldglobal=%04X\\n",pc,b@cea26,b@(a5+54),b@(a5+55),b@(a5+47),w@(a5+80),w@(a5+8c),b@(a5+69),b@(a5+5e),w@(a5+8e),w@cea12;g')
+      for _, pc in ipairs({ 0x343f4, 0x34418, 0x34424, 0x3443a,
+                            0x34448, 0x34454, 0x34474, 0x34478 }) do
+        source_watchpoints[#source_watchpoints + 1] =
+          debugger:bpset(pc, "a5==c0840",
+            'printf "STATE24_SOURCE_PC pc=%06X\\n",pc;g')
+      end
+    elseif mode == "state24_source_inputs" then
+      breakpoint = debugger:bpset(0x343c4, "a5==c0840",
+        'printf "STATE24_SOURCE pc=%06X flag26=%02X flag54=%02X flag55=%02X flag47=%02X word80=%04X word8c=%04X flag69=%02X flag5e=%02X word8e=%04X oldglobal=%04X\\n",pc,b@cea26,b@(a5+54),b@(a5+55),b@(a5+47),w@(a5+80),w@(a5+8c),b@(a5+69),b@(a5+5e),w@(a5+8e),w@cea12;g')
+    elseif mode == "state24_source_targets" then
+      breakpoint = debugger:bpset(0x34478, "a5==c0840",
+        'printf "STATE24_SOURCE_TARGET pc=%06X desired=%04X limit=%04X\\n",pc,d0,d1;g')
+    elseif mode == "state24_forward_inputs" then
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x374d0, "1",
+        'printf "FORWARD_INIT pc=%06X old86=%04X old88=%04X old7a=%04X old7c=%04X\\n",pc,w@c08c6,w@c08c8,w@c08ba,w@c08bc;g')
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x34d44, "a5==c0840",
+        'printf "FORWARD_BRANCH pc=%06X word80=%04X flag91=%02X\\n",pc,w@(a5+80),b@(a5+91);g')
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x34e24, "a5==c0840",
+        'printf "FORWARD_FLAG pc=%06X flag69=%02X\\n",pc,b@(a5+69);g')
+    elseif mode == "state24_forward_targets" then
+      breakpoint = debugger:bpset(0x34ef4, "a5==c0840",
+        'printf "FORWARD_TARGET pc=%06X word86=%04X word88=%04X word7a=%04X word7c=%04X\\n",pc,w@(a5+86),w@(a5+88),w@(a5+7a),w@(a5+7c);g')
+    elseif mode == "state24_forward_order" then
+      for _, pc in ipairs({ 0x374d0, 0x343c4, 0x344a0, 0x33922,
+                            0x34d44, 0x34da4, 0x34dda, 0x34e24, 0x34ef4 }) do
+        local condition = pc == 0x374d0 and "1" or
+                          pc == 0x33922 and "a0==c0840" or "a5==c0840"
+        source_watchpoints[#source_watchpoints + 1] =
+          debugger:bpset(pc, condition,
+            'printf "FORWARD_PC pc=%06X\\n",pc;g')
+      end
     else
       local addresses = mode == "state24_writes" and { 0x0c0864 } or
                         mode == "state8a_writes" and { 0x0c08ca } or
@@ -195,7 +232,9 @@ emu.register_frame_done(function()
       if mode == "state86_path" or mode == "state8a_chain_order" or
          mode == "state8a_chain_inputs" or mode == "state7c_inputs" or
          mode == "state7c_dev" or mode == "state7c_carry_inputs" or
-         mode == "state24_order" then debugger:bpclear(index)
+         mode == "state24_order" or mode == "state24_source_dev" or
+         mode == "state24_forward_inputs" or
+         mode == "state24_forward_order" then debugger:bpclear(index)
       else debugger:wpclear(index) end
     end
     print("UPSTREAM_CLEARED,1000")
