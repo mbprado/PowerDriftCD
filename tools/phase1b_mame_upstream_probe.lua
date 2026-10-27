@@ -9,7 +9,8 @@ assert(mode == "table_boot" or mode == "state_inputs" or
        mode == "state8a_targets" or mode == "state8a_chain_order" or
        mode == "state8a_chain_inputs" or mode == "state8a_chain_targets" or
        mode == "state7c_dev" or mode == "state7c_inputs" or
-       mode == "state7c_targets")
+       mode == "state7c_targets" or mode == "state7c_carry_inputs" or
+       mode == "state7c_carry_targets")
 local cpu = assert(manager.machine.devices[":maincpu"])
 local space = assert(cpu.spaces["program"])
 local debugger = assert(cpu.debug)
@@ -149,6 +150,14 @@ emu.register_frame_done(function()
     elseif mode == "state7c_targets" then
       breakpoint = debugger:bpset(0x34ef4, "a5==c0840",
         'printf "STATE7C_TARGET pc=%06X new7c=%04X\\n",pc,w@(a5+7c);g')
+    elseif mode == "state7c_carry_inputs" then
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x34dda, "a5==c0840",
+        'printf "CARRY_A pc=%06X sign88=%04X old7a=%04X old7c=%04X\\n",pc,w@(a5+88),w@(a5+7a),w@(a5+7c);g')
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x34e24, "a5==c0840",
+        'printf "CARRY_B pc=%06X word86=%04X word24=%04X word8a=%04X flag69=%02X\\n",pc,w@(a5+86),w@(a5+24),w@(a5+8a),b@(a5+69);g')
+    elseif mode == "state7c_carry_targets" then
+      breakpoint = debugger:bpset(0x34ef4, "a5==c0840",
+        'printf "CARRY_TARGET pc=%06X new7a=%04X new7c=%04X\\n",pc,w@(a5+7a),w@(a5+7c);g')
     else
       local addresses = mode == "state8a_writes" and { 0x0c08ca } or
                         mode == "state8a_source" and { 0x0ce0ce } or
@@ -168,7 +177,7 @@ emu.register_frame_done(function()
     for _, index in ipairs(source_watchpoints) do
       if mode == "state86_path" or mode == "state8a_chain_order" or
          mode == "state8a_chain_inputs" or mode == "state7c_inputs" or
-         mode == "state7c_dev" then debugger:bpclear(index)
+         mode == "state7c_dev" or mode == "state7c_carry_inputs" then debugger:bpclear(index)
       else debugger:wpclear(index) end
     end
     print("UPSTREAM_CLEARED,1000")
