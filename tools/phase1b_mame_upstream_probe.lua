@@ -1,7 +1,8 @@
 -- Read-only table-writer and upstream state-word probes for the arcade main CPU.
 local mode = assert(os.getenv("PDRIFT_UPSTREAM_MODE"))
 assert(mode == "table_boot" or mode == "state_inputs" or
-       mode == "state_targets")
+       mode == "state_targets" or mode == "state88_inputs" or
+       mode == "state88_targets" or mode == "source_writes")
 local cpu = assert(manager.machine.devices[":maincpu"])
 local space = assert(cpu.spaces["program"])
 local debugger = assert(cpu.debug)
@@ -23,6 +24,7 @@ local frames = mode == "table_boot" and 0 or 950
 local ready = mode == "table_boot"
 local breakpoint
 local entry_breakpoints = {}
+local source_watchpoints = {}
 machine_debugger.execution_state = "run"
 machine_debugger.visible_cpu = cpu
 
@@ -81,14 +83,27 @@ emu.register_frame_done(function()
     if mode == "state_inputs" then
       breakpoint = debugger:bpset(0x34dda, "a5==c0840",
         'printf "STATE_INPUT pc=%06X a5=%06X old7a=%04X source7c=%04X sign88=%04X\\n",pc,a5,w@(a5+7a),w@(a5+7c),w@(a5+88);g')
-    else
+    elseif mode == "state_targets" then
       breakpoint = debugger:bpset(0x34e0a, "a5==c0840",
         'printf "STATE_TARGET pc=%06X a5=%06X new7a=%04X\\n",pc,a5,w@(a5+7a);g')
+    elseif mode == "state88_inputs" then
+      breakpoint = debugger:bpset(0x34da4, "a5==c0840",
+        'printf "STATE88_INPUT pc=%06X a5=%06X source86=%04X old88=%04X\\n",pc,a5,w@(a5+86),w@(a5+88);g')
+    elseif mode == "state88_targets" then
+      breakpoint = debugger:bpset(0x34dda, "a5==c0840",
+        'printf "STATE88_TARGET pc=%06X a5=%06X new88=%04X\\n",pc,a5,w@(a5+88);g')
+    else
+      for _, address in ipairs({ 0x0c08ba, 0x0c08bc, 0x0c08c8 }) do
+        source_watchpoints[#source_watchpoints + 1] =
+          debugger:wpset(space, "w", address, 2, "1",
+            'printf "STATE_SOURCE_WRITE pc=%06X addr=%06X data=%08X\\n",pc,wpaddr,wpdata;g')
+      end
     end
     print(string.format("UPSTREAM_ARMED,%s,960,pulse=%d", mode, pulse))
   end
   if frames == 1000 then
-    debugger:bpclear(breakpoint)
+    if breakpoint then debugger:bpclear(breakpoint) end
+    for _, index in ipairs(source_watchpoints) do debugger:wpclear(index) end
     print("UPSTREAM_CLEARED,1000")
   end
 end, "frame")
