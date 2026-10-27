@@ -4,7 +4,9 @@ assert(mode == "table_boot" or mode == "state_inputs" or
        mode == "state_targets" or mode == "state88_inputs" or
        mode == "state88_targets" or mode == "source_writes" or
        mode == "state86_inputs" or mode == "state86_targets" or
-       mode == "state86_path")
+       mode == "state86_path" or mode == "state8a_writes" or
+       mode == "state8a_source" or mode == "state8a_inputs" or
+       mode == "state8a_targets")
 local cpu = assert(manager.machine.devices[":maincpu"])
 local space = assert(cpu.spaces["program"])
 local debugger = assert(cpu.debug)
@@ -107,11 +109,22 @@ emu.register_frame_done(function()
           debugger:bpset(pc, "a5==c0840",
             'printf "STATE86_PATH pc=%06X\\n",pc;g')
       end
+    elseif mode == "state8a_inputs" then
+      breakpoint = debugger:bpset(0x374d0, "1",
+        'printf "STATE8A_INPUT pc=%06X a5=%06X raw=%02X old16=%04X old18=%04X oldglobal=%04X\\n",pc,a5,b@cff27,w@(a5+16),w@(a5+18),w@ce0ce;g')
+    elseif mode == "state8a_targets" then
+      breakpoint = debugger:bpset(0x33922, "a0==c0840",
+        'printf "STATE8A_TARGET pc=%06X a0=%06X new8a=%04X\\n",pc,a0,w@(a0+8a);g')
     else
-      for _, address in ipairs({ 0x0c08ba, 0x0c08bc, 0x0c08c8 }) do
+      local addresses = mode == "state8a_writes" and { 0x0c08ca } or
+                        mode == "state8a_source" and { 0x0ce0ce } or
+                        { 0x0c08ba, 0x0c08bc, 0x0c08c8 }
+      for _, address in ipairs(addresses) do
         source_watchpoints[#source_watchpoints + 1] =
           debugger:wpset(space, "w", address, 2, "1",
-            'printf "STATE_SOURCE_WRITE pc=%06X addr=%06X data=%08X\\n",pc,wpaddr,wpdata;g')
+            (mode == "state8a_writes" or mode == "state8a_source") and
+              'printf "STATE8A_WRITE pc=%06X addr=%06X data=%08X\\n",pc,wpaddr,wpdata;g' or
+              'printf "STATE_SOURCE_WRITE pc=%06X addr=%06X data=%08X\\n",pc,wpaddr,wpdata;g')
       end
     end
     print(string.format("UPSTREAM_ARMED,%s,960,pulse=%d", mode, pulse))
