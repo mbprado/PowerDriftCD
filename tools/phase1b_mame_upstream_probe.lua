@@ -10,7 +10,9 @@ assert(mode == "table_boot" or mode == "state_inputs" or
        mode == "state8a_chain_inputs" or mode == "state8a_chain_targets" or
        mode == "state7c_dev" or mode == "state7c_inputs" or
        mode == "state7c_targets" or mode == "state7c_carry_inputs" or
-       mode == "state7c_carry_targets")
+       mode == "state7c_carry_targets" or mode == "state24_writes" or
+       mode == "state24_inputs" or mode == "state24_targets" or
+       mode == "state24_order")
 local cpu = assert(manager.machine.devices[":maincpu"])
 local space = assert(cpu.spaces["program"])
 local debugger = assert(cpu.debug)
@@ -158,13 +160,28 @@ emu.register_frame_done(function()
     elseif mode == "state7c_carry_targets" then
       breakpoint = debugger:bpset(0x34ef4, "a5==c0840",
         'printf "CARRY_TARGET pc=%06X new7a=%04X new7c=%04X\\n",pc,w@(a5+7a),w@(a5+7c);g')
+    elseif mode == "state24_inputs" then
+      breakpoint = debugger:bpset(0x34478, "a5==c0840",
+        'printf "STATE24_INPUT pc=%06X a5=%06X desired=%04X limit=%04X oldglobal=%04X\\n",pc,a5,d0,d1,w@cea12;g')
+    elseif mode == "state24_targets" then
+      breakpoint = debugger:bpset(0x344a0, "a5==c0840",
+        'printf "STATE24_TARGET pc=%06X a5=%06X new24=%04X\\n",pc,a5,w@(a5+24);g')
+    elseif mode == "state24_order" then
+      for _, pc in ipairs({ 0x344a0, 0x34d44, 0x34e24 }) do
+        source_watchpoints[#source_watchpoints + 1] =
+          debugger:bpset(pc, "a5==c0840",
+            'printf "STATE24_PC pc=%06X\\n",pc;g')
+      end
     else
-      local addresses = mode == "state8a_writes" and { 0x0c08ca } or
+      local addresses = mode == "state24_writes" and { 0x0c0864 } or
+                        mode == "state8a_writes" and { 0x0c08ca } or
                         mode == "state8a_source" and { 0x0ce0ce } or
                         { 0x0c08ba, 0x0c08bc, 0x0c08c8 }
       for _, address in ipairs(addresses) do
         source_watchpoints[#source_watchpoints + 1] =
           debugger:wpset(space, "w", address, 2, "1",
+            mode == "state24_writes" and
+              'printf "STATE24_WRITE pc=%06X addr=%06X data=%08X\\n",pc,wpaddr,wpdata;g' or
             (mode == "state8a_writes" or mode == "state8a_source") and
               'printf "STATE8A_WRITE pc=%06X addr=%06X data=%08X\\n",pc,wpaddr,wpdata;g' or
               'printf "STATE_SOURCE_WRITE pc=%06X addr=%06X data=%08X\\n",pc,wpaddr,wpdata;g')
@@ -177,7 +194,8 @@ emu.register_frame_done(function()
     for _, index in ipairs(source_watchpoints) do
       if mode == "state86_path" or mode == "state8a_chain_order" or
          mode == "state8a_chain_inputs" or mode == "state7c_inputs" or
-         mode == "state7c_dev" or mode == "state7c_carry_inputs" then debugger:bpclear(index)
+         mode == "state7c_dev" or mode == "state7c_carry_inputs" or
+         mode == "state24_order" then debugger:bpclear(index)
       else debugger:wpclear(index) end
     end
     print("UPSTREAM_CLEARED,1000")
