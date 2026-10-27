@@ -6,7 +6,8 @@ assert(mode == "table_boot" or mode == "state_inputs" or
        mode == "state86_inputs" or mode == "state86_targets" or
        mode == "state86_path" or mode == "state8a_writes" or
        mode == "state8a_source" or mode == "state8a_inputs" or
-       mode == "state8a_targets")
+       mode == "state8a_targets" or mode == "state8a_chain_order" or
+       mode == "state8a_chain_inputs" or mode == "state8a_chain_targets")
 local cpu = assert(manager.machine.devices[":maincpu"])
 local space = assert(cpu.spaces["program"])
 local debugger = assert(cpu.debug)
@@ -115,6 +116,25 @@ emu.register_frame_done(function()
     elseif mode == "state8a_targets" then
       breakpoint = debugger:bpset(0x33922, "a0==c0840",
         'printf "STATE8A_TARGET pc=%06X a0=%06X new8a=%04X\\n",pc,a0,w@(a0+8a);g')
+    elseif mode == "state8a_chain_order" then
+      for _, pc in ipairs({ 0x374d0, 0x33922, 0x34d44, 0x34da4,
+                            0x34dda, 0x34e0a }) do
+        local condition = pc == 0x374d0 and "1" or
+                          pc == 0x33922 and "a0==c0840" or "a5==c0840"
+        source_watchpoints[#source_watchpoints + 1] =
+          debugger:bpset(pc, condition,
+            'printf "STATE8A_CHAIN_PC pc=%06X\\n",pc;g')
+      end
+    elseif mode == "state8a_chain_inputs" then
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x374d0, "1",
+        'printf "CHAIN_INIT pc=%06X raw=%02X old86=%04X old88=%04X old7a=%04X\\n",pc,b@cff27,w@c08c6,w@c08c8,w@c08ba;g')
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x34d44, "a5==c0840",
+        'printf "CHAIN_BRANCH pc=%06X word24=%04X word80=%04X flag91=%02X\\n",pc,w@(a5+24),w@(a5+80),b@(a5+91);g')
+      source_watchpoints[#source_watchpoints + 1] = debugger:bpset(0x34dda, "a5==c0840",
+        'printf "CHAIN_EXOGENOUS pc=%06X word7c=%04X\\n",pc,w@(a5+7c);g')
+    elseif mode == "state8a_chain_targets" then
+      breakpoint = debugger:bpset(0x34e0a, "a5==c0840",
+        'printf "CHAIN_TARGET pc=%06X word86=%04X word88=%04X word7a=%04X\\n",pc,w@(a5+86),w@(a5+88),w@(a5+7a);g')
     else
       local addresses = mode == "state8a_writes" and { 0x0c08ca } or
                         mode == "state8a_source" and { 0x0ce0ce } or
@@ -132,7 +152,8 @@ emu.register_frame_done(function()
   if frames == 1000 then
     if breakpoint then debugger:bpclear(breakpoint) end
     for _, index in ipairs(source_watchpoints) do
-      if mode == "state86_path" then debugger:bpclear(index)
+      if mode == "state86_path" or mode == "state8a_chain_order" or
+         mode == "state8a_chain_inputs" then debugger:bpclear(index)
       else debugger:wpclear(index) end
     end
     print("UPSTREAM_CLEARED,1000")
