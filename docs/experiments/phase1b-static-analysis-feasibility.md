@@ -1,5 +1,7 @@
 # Phase 1B static-analysis feasibility — 2026-10-27
 
+**Follow-up status — verified by execution:** the bounded pilot below has since been extended with main-CPU steering, `$8A/$86/$88/$7A/$7C` producer tests and a held-out one-update `$7C → $7A` carry. See the [current dependency map](phase1b-camera-dependency-map.md) and [carry report](2026-10-27-state7c-carry.md). The original pilot result and its limitations remain as recorded below; Ghidra/REA were still **NOT RUN** in these follow-ups.
+
 ## Question and decision
 
 **Hypothesis:** a correctly mapped main-CPU program and bounded static instruction analysis can reveal an earlier dependency of the known projection producer, allowing a prediction on an unused MAME input schedule. **Baseline:** `3a6fa81` on `experiment/perspective-road`; owner-private `pdrift` ROM set and callback-950 saved state; prior [transform-producer evidence](2026-10-21-arcade-transform-producer.md). **Acceptance:** verify four ROM chips and seven addresses against live MAME, freeze a producer rule before reading held-out outputs, then predict one upstream field exactly at its callback. The frozen [pilot plan](phase1b-code-led-pilot-plan.md) records a failed ROM-table assumption and its revised RAM-table test before the target replay.
