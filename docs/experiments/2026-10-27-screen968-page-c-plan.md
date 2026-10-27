@@ -1,0 +1,21 @@
+# Phase 1B: screen-968 page-C timing hypothesis — 2026-10-27
+
+**Hypothesis:** page `$C000–$CFFF` in Y-sprite RAM, hidden at Lua callback 967, supplies the ten previously frozen screen-968 edge pixels via native bitmap 967. **Baseline:** local `661334f`, the same pulse-204 callback-950 state and isolated native-968 MAME build. The [previous page-E test](2026-10-27-screen968-native-source.md) failed 0/10; no pixel or camera packet will be reselected.
+
+**Basis before target replay — documented from the pinned MAME source and verified by read-only inspection of private snapshots:** `sega_yboard_sprite_device::draw` traverses `spriteram()` at render time; the Y-board driver maps that RAM at sub-X `$180000–$18FFFF` and calls `draw_async` before rotation. The callback-967 reachable list points into page E, but callback-968 points into page C. The entire page-C byte range was identical between those two snapshots, so a callback-967 page-C hide is a targeted test of the page used after the list head changes. This does not establish when the head changes relative to Lua callbacks; the intervention tests that timing.
+
+**Acceptance:** generate an owner-private source override that changes only active page-C descriptor hide bytes. Run a fresh pulse-204 MAME replay with `PDRIFT_SOURCE_OVERRIDE_FRAME=967` and `PDRIFT_SOURCE_OVERRIDE_RANGE=C000:1000`. Require exact post-write source bytes, unchanged screens 960–967, unchanged original baseline, all ten edge RGB pixels changed, and all ten corresponding native-967 words changed from opaque to `$FFFF` under the frozen pre-966 transform. If page C misses, stop and record the mismatch. If it passes, use the already captured page-C linked list and a bounded interval search within that page to isolate descriptors; freeze each next group before execution. A final exact-slot set needs an independent repeat. No five-word Sega CD packet fit, renderer change, physical test or push.
+
+**First narrowing split, frozen after the page-C pass and before group replays — verified by execution for the page-C gate:** page C changed 10/10 RGB and 10/10 native samples with prior screens unchanged. The callback-968 linked list occupies `$C000–$C6E0` (111 descriptors). Split the same callback-967 source into `$C000:0380` and `$C380:0380`. Report the ten-pixel vector for each half; do not require one half to explain all ten, since different descriptors may supply left and right sides. If a half has effects, split only that half again. The goal is an exact-slot set, with an independent repeat and native proof.
+
+**Second split, frozen after the first half results and before new replays — verified by execution for the first split:** `$C000:0380` changed 0/10 RGB and native samples; `$C380:0380` changed 10/10 of each. Split only the latter into `$C380:01C0` and `$C540:01C0`. Continue to record each side's five-row vector; a zero-effect half is not searched further under this schedule.
+
+**Third split, frozen after the second half results:** `$C380:01C0` changed 0/10 and `$C540:01C0` changed 10/10 for both RGB and native samples. Split `$C540:01C0` into `$C540:00E0` and `$C620:00E0`. Keep the same ten coordinates and prior-screen controls.
+
+**Fourth split, frozen after the third results:** `$C540:00E0` changed 0/10; `$C620:00E0` changed 10/10. Split only `$C620:00E0` into `$C620:0070` and `$C690:0070` (seven slots each before any inactive descriptors). Keep the same checks.
+
+**Fifth split, frozen after the fourth results:** `$C620:0070` changed 10/10; `$C690:0070` changed 0/10. Split the seven active slots into `$C620:0040` and `$C660:0030` and score all ten previously selected pixels.
+
+**Sixth split, frozen after the fifth results:** `$C620:0040` changed 10/10; `$C660:0030` changed 0/10. Split `$C620:0040` into `$C620:0020` and `$C640:0020`.
+
+**Seventh split, frozen after the sixth results:** `$C620:0020` changed 10/10; `$C640:0020` changed 0/10. Test descriptor `$C620` and `$C630` separately with one-slot ranges. If one slot changes all ten RGB/native samples, repeat that exact-slot replay twice in fresh private directories before declaring source attribution. If neither does, retain the two-slot interaction result without assigning an individual source.
