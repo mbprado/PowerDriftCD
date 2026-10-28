@@ -73,7 +73,12 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
   or debug_mode == "bsprite" or debug_mode == "position_math"
-  or debug_mode == "position_chain")
+  or debug_mode == "position_chain" or debug_mode == "position_offset")
+local position_offset_phase = os.getenv("PDRIFT_POSITION_OFFSET_PHASE")
+assert(not position_offset_phase or (debug_mode == "position_offset"
+  and (position_offset_phase == "input" or position_offset_phase == "output"
+    or position_offset_phase == "both")))
+assert(debug_mode ~= "position_offset" or position_offset_phase)
 local position_chain_phase = os.getenv("PDRIFT_POSITION_CHAIN_PHASE")
 assert(not position_chain_phase or (debug_mode == "position_chain"
   and (position_chain_phase == "input" or position_chain_phase == "output"
@@ -149,7 +154,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
   or debug_mode == "bsprite" or debug_mode == "position_math"
-  or debug_mode == "position_chain"
+  or debug_mode == "position_chain" or debug_mode == "position_offset"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
 local bsprite_write_tap
@@ -342,10 +347,11 @@ emu.register_frame_done(function()
   end
   if (ysprite_sequence_trace or debug_mode == "projection"
       or debug_mode == "transform" or debug_mode == "position_math"
-      or debug_mode == "position_chain")
+      or debug_mode == "position_chain" or debug_mode == "position_offset")
       and frames >= 960 and
       frames <= ((debug_mode == "projection" or debug_mode == "transform"
-          or debug_mode == "position_math" or debug_mode == "position_chain")
+          or debug_mode == "position_math" or debug_mode == "position_chain"
+          or debug_mode == "position_offset")
         and sequence_end or ysprite_sequence_end) then
     manager.machine.debugger:command(
       string.format('printf "SEQUENCE_FRAME,%d\\n"', frames))
@@ -519,6 +525,12 @@ emu.register_frame_done(function()
         print("DISASM," .. path)
       end
       if shared_watch_address then
+        if shared_watch_address == 0x0cea04 then
+          local offset_path = disasm_dir .. "/main-cea04-writer.asm"
+          manager.machine.debugger:command(
+            string.format("dasm %s,34500,100,0,:maincpu", offset_path))
+          print("DISASM," .. offset_path)
+        end
         if os.getenv("PDRIFT_MAIN_LIST_DISASM") == "1" then
           local list_path = disasm_dir .. "/main-list-copy.asm"
           manager.machine.debugger:command(
@@ -756,6 +768,29 @@ emu.register_frame_done(function()
   if debug_mode == "position_chain" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("POSITION_CHAIN_CLEARED," .. frames)
+  end
+  if debug_mode == "position_offset" and frames == 960 then
+    if position_offset_phase == "input" or position_offset_phase == "both" then
+      local action = 'printf "POSITION_OFFSET_INPUT pc=%06X old=%04X delta=%04X\\n",pc,w@cea00,d7;g'
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x3451c, "1", action)
+    end
+    if position_offset_phase == "output" or position_offset_phase == "both" then
+      for _, item in ipairs({
+          { 0x3454e, 'printf "POSITION_OFFSET_OUTPUT pc=%06X offset=%04X phase=%04X\\n",pc,w@cea04,w@cea02;g' },
+          { 0x34b02, 'printf "POSITION_OFFSET_INDEX pc=%06X index=%04X\\n",pc,d1;g' },
+          { 0x34c1c, 'printf "POSITION_OFFSET_COEFFICIENT pc=%06X coefficient=%04X\\n",pc,w@(a6+2);g' },
+        }) do
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(item[1], item[1] == 0x3454e and "1"
+            or "a5==c0840", item[2])
+      end
+    end
+    print("POSITION_OFFSET_ARMED," .. position_offset_phase)
+  end
+  if debug_mode == "position_offset" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("POSITION_OFFSET_CLEARED," .. frames)
   end
   if debug_mode == "projection" and frames == 960 then
     manager.machine.debugger.visible_cpu = manager.machine.devices[":maincpu"]
