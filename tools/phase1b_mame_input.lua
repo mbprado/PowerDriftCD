@@ -72,12 +72,21 @@ local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
-  or debug_mode == "bsprite" or debug_mode == "position_math")
+  or debug_mode == "bsprite" or debug_mode == "position_math"
+  or debug_mode == "position_chain")
+local position_chain_phase = os.getenv("PDRIFT_POSITION_CHAIN_PHASE")
+assert(not position_chain_phase or (debug_mode == "position_chain"
+  and (position_chain_phase == "input" or position_chain_phase == "output"
+    or position_chain_phase == "both")))
+assert(debug_mode ~= "position_chain" or position_chain_phase)
 local position_math_phase = os.getenv("PDRIFT_POSITION_MATH_PHASE")
 assert(not position_math_phase or (debug_mode == "position_math"
   and (position_math_phase == "input" or position_math_phase == "output"
     or position_math_phase == "both")))
 assert(debug_mode ~= "position_math" or position_math_phase)
+local position_upstream_trace = os.getenv("PDRIFT_POSITION_UPSTREAM_TRACE") == "1"
+assert(not position_upstream_trace or
+  (debug_mode == "position_math" and position_math_phase == "both"))
 local shared_watch_address = os.getenv("PDRIFT_SHARED_WATCH_ADDR")
   and tonumber(os.getenv("PDRIFT_SHARED_WATCH_ADDR"), 16)
 local shared_watch_until = tonumber(os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or "")
@@ -140,6 +149,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
   or debug_mode == "bsprite" or debug_mode == "position_math"
+  or debug_mode == "position_chain"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
 local bsprite_write_tap
@@ -331,10 +341,11 @@ emu.register_frame_done(function()
     end
   end
   if (ysprite_sequence_trace or debug_mode == "projection"
-      or debug_mode == "transform" or debug_mode == "position_math")
+      or debug_mode == "transform" or debug_mode == "position_math"
+      or debug_mode == "position_chain")
       and frames >= 960 and
       frames <= ((debug_mode == "projection" or debug_mode == "transform"
-          or debug_mode == "position_math")
+          or debug_mode == "position_math" or debug_mode == "position_chain")
         and sequence_end or ysprite_sequence_end) then
     manager.machine.debugger:command(
       string.format('printf "SEQUENCE_FRAME,%d\\n"', frames))
@@ -669,6 +680,32 @@ emu.register_frame_done(function()
     print(string.format("WATCH_CLEARED,%d", frames))
   end
   if debug_mode == "position_math" and frames == 960 then
+    if position_upstream_trace then
+      local ram = assert(manager.machine.devices[":maincpu"].spaces["program"])
+      local action = 'printf "POSITION_OPERAND_WRITE pc=%06X addr=%06X data=%08X a5=%06X d0=%08X d1=%08X d2=%08X\\n",pc,wpaddr,wpdata,a5,d0,d1,d2;g'
+      local index = cpu_debug:wpset(ram, "w", 0x0c0868, 2, "1", action)
+      watchpoints[#watchpoints + 1] = { cpu_debug, index }
+      for _, item in ipairs({
+          { 0x34af8, 'printf "POSITION_INDEX_SOURCE pc=%06X d0=%08X operand=%04X\\n",pc,d0,w@(a5+28);g' },
+          { 0x34b02, 'printf "POSITION_INDEX_VALUE pc=%06X d0=%08X d1=%08X operand=%04X\\n",pc,d0,d1,w@(a5+28);g' },
+          { 0x34c02, 'printf "POSITION_COEFFICIENT_INDEX pc=%06X d1=%08X operand=%04X\\n",pc,d1,w@(a5+28);g' },
+        }) do
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(item[1], "a5==c0840", item[2])
+      end
+      local disasm_dir = os.getenv("PDRIFT_DISASM_DIR")
+      if disasm_dir then
+        local path = disasm_dir .. "/main-position-operand-path.asm"
+        manager.machine.debugger:command(
+          string.format("dasm %s,34b90,100,0,:maincpu", path))
+        print("POSITION_UPSTREAM_DISASM," .. path)
+        local writer_path = disasm_dir .. "/main-position-operand-writer.asm"
+        manager.machine.debugger:command(
+          string.format("dasm %s,34ed0,190,0,:maincpu", writer_path))
+        print("POSITION_UPSTREAM_DISASM," .. writer_path)
+      end
+      print("POSITION_UPSTREAM_ARMED,0C0868,34AF8,34B02,34C02")
+    end
     if position_math_phase == "input" or position_math_phase == "both" then
       local action = 'printf "POSITION_MATH_INPUT pc=%06X a5=%06X a6=%06X base=%04X operand=%04X coefficient=%04X\\n",pc,a5,a6,w@(a5+16),w@a6,w@(a6+2);g'
       main_record_breakpoints[#main_record_breakpoints + 1] =
@@ -682,8 +719,43 @@ emu.register_frame_done(function()
     print("POSITION_MATH_ARMED," .. position_math_phase)
   end
   if debug_mode == "position_math" and frames == sequence_end then
+    for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("POSITION_MATH_CLEARED," .. frames)
+  end
+  if debug_mode == "position_chain" and frames == 960 then
+    if position_chain_phase == "input" or position_chain_phase == "both" then
+      local base_action = position_chain_phase == "both"
+        and 'printf "POSITION_CHAIN_BASE pc=%06X base=%04X\\n",pc,w@(a5+16);printf "POSITION_CHAIN_COEFFICIENT pc=%06X value=%04X\\n",pc,w@(a6+2);g'
+        or 'printf "POSITION_CHAIN_BASE pc=%06X base=%04X\\n",pc,w@(a5+16);g'
+      for _, item in ipairs({
+          { 0x34fa4, 'printf "POSITION_CHAIN_PRE pc=%06X d0=%08X d3=%08X state80=%04X state7e=%04X\\n",pc,d0,d3,w@(a5+80),w@(a5+7e);g' },
+          { 0x34b02, 'printf "POSITION_CHAIN_INDEX pc=%06X d1=%08X\\n",pc,d1;g' },
+          { 0x34c1c, base_action },
+        }) do
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(item[1], "a5==c0840", item[2])
+      end
+    end
+    if position_chain_phase == "output" or position_chain_phase == "both" then
+      for _, item in ipairs({
+          { 0x34fda, 'printf "POSITION_CHAIN_OPERAND pc=%06X value=%04X\\n",pc,w@(a5+28);g' },
+          { 0x34c38, 'printf "POSITION_CHAIN_ADJUSTED pc=%06X value=%04X\\n",pc,w@(a5+16);g' },
+        }) do
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(item[1], "a5==c0840", item[2])
+      end
+      if position_chain_phase == "output" then
+        local action = 'printf "POSITION_CHAIN_COEFFICIENT pc=%06X value=%04X\\n",pc,w@(a6+2);g'
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(0x34c1c, "a5==c0840", action)
+      end
+    end
+    print("POSITION_CHAIN_ARMED," .. position_chain_phase)
+  end
+  if debug_mode == "position_chain" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("POSITION_CHAIN_CLEARED," .. frames)
   end
   if debug_mode == "projection" and frames == 960 then
     manager.machine.debugger.visible_cpu = manager.machine.devices[":maincpu"]
