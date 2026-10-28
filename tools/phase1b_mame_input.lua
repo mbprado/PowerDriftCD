@@ -90,7 +90,8 @@ assert(ysprite_watch_offset and ysprite_watch_offset % 16 == 0
 local ysprite_input_trace = os.getenv("PDRIFT_YSPRITE_INPUT_TRACE") == "1"
 assert(not ysprite_input_trace or debug_mode == "ysprite")
 local ysprite_input_slot = tonumber(os.getenv("PDRIFT_YSPRITE_INPUT_SLOT") or "C630", 16)
-assert(ysprite_input_slot == 0xc630 or ysprite_input_slot == 0xc6b0)
+assert(ysprite_input_slot == 0xa630 or ysprite_input_slot == 0xc630
+  or ysprite_input_slot == 0xc6b0)
 local ysprite_sequence_trace = os.getenv("PDRIFT_YSPRITE_SEQUENCE_TRACE") == "1"
 assert(not ysprite_sequence_trace or debug_mode == "ysprite")
 local ysprite_sequence_last_kind = tonumber(
@@ -152,6 +153,13 @@ assert(not os.getenv("PDRIFT_PROJECTION_GLOBAL_X_DELTA") or
   (debug_mode == "shared" and projection_global_x_delta
     and projection_global_x_delta >= 0 and projection_global_x_delta <= 0x100
     and not geometry_override_word))
+local road_record_x_delta = os.getenv("PDRIFT_ROAD_RECORD_X_DELTA")
+  and tonumber(os.getenv("PDRIFT_ROAD_RECORD_X_DELTA"), 16)
+assert(not os.getenv("PDRIFT_ROAD_RECORD_X_DELTA") or
+  (debug_mode == "shared" and shared_watch_address == 0x0c9a60
+    and road_record_x_delta and road_record_x_delta >= 0
+    and road_record_x_delta <= 0x100 and not geometry_override_word
+    and not projection_global_x_delta))
 if debug_watch then
   assert(manager.machine.debugger)
   manager.machine.debugger.execution_state = "run"
@@ -631,6 +639,20 @@ emu.register_frame_done(function()
           cpu_debug:bpset(0x33e84, condition, exit_action)
       end
       print(string.format("GLOBAL_X_OVERRIDE_ARMED,%X,3", projection_global_x_delta))
+    end
+    if road_record_x_delta then
+      local condition = "a5==c1c80&&a0==c9800"
+      local entry = string.format(
+        'printf "ROAD_X_ENTRY pc=%%06X a5=%%06X old=%%04X\\n",pc,a5,w@(a4+1c);w@(a4+1c)=w@(a4+1c)+%x;printf "ROAD_X_CHANGED a5=%%06X value=%%04X\\n",a5,w@(a4+1c);g',
+        road_record_x_delta)
+      local leave = string.format(
+        'printf "ROAD_X_OUTPUT pc=%%06X a5=%%06X slot=%%04X record_x=%%04X record_y=%%04X changed=%%04X\\n",pc,a5,d0,w@(a5+4),w@(a5+6),w@(a4+1c);w@(a4+1c)=w@(a4+1c)-%x;printf "ROAD_X_RESTORED a5=%%06X value=%%04X\\n",a5,w@(a4+1c);g',
+        road_record_x_delta)
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33d1e, condition, entry)
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33e84, condition, leave)
+      print(string.format("ROAD_X_OVERRIDE_ARMED,%X,C1C80,C9800", road_record_x_delta))
     end
   end
   if debug_mode == "shared" and frames ==
