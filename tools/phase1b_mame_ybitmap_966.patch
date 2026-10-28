@@ -1,0 +1,6 @@
+diff --git a/src/mame/sega/segaybd.cpp b/src/mame/sega/segaybd.cpp
+--- a/src/mame/sega/segaybd.cpp
++++ b/src/mame/sega/segaybd.cpp
+@@ -485 +485 @@ uint32_t segaybd_state::screen_update(screen_device &screen, bitmap_ind16 &bitma
+-		if (frame >= 967 && frame <= 968)
++		if (frame >= 966 && frame <= 968)
