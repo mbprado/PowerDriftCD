@@ -48,6 +48,13 @@ assert(not os.getenv("PDRIFT_EXTRA_SCREEN_FRAME") or extra_screen_frame == 971)
 local state_save = os.getenv("PDRIFT_STATE_SAVE")
 local state_load = os.getenv("PDRIFT_STATE_LOAD")
 assert(not state_save or not state_load)
+local state7a_delta_frame = tonumber(os.getenv("PDRIFT_STATE7A_DELTA_FRAME") or "")
+local state7a_delta = tonumber(os.getenv("PDRIFT_STATE7A_DELTA") or "")
+assert((not state7a_delta_frame and not state7a_delta)
+  or (state_load and (state7a_delta_frame == 965 or state7a_delta_frame == 966)
+    and state7a_delta
+    and state7a_delta >= -16 and state7a_delta <= 16
+    and state7a_delta ~= 0))
 assert(not source_override or source_output)
 assert(not source_override_range or source_override)
 local override_start, override_size = 0, 0x10000
@@ -95,7 +102,8 @@ local ysprite_sequence_end = tonumber(
 assert(not os.getenv("PDRIFT_YSPRITE_SEQUENCE_END_FRAME") or
   (ysprite_sequence_trace and ysprite_sequence_end
     and ysprite_sequence_end >= 971 and ysprite_sequence_end <= 1000))
-local ram_space = (ram_output or debug_mode or geometry_output or list_output)
+local ram_space = (ram_output or debug_mode or geometry_output or list_output
+  or state7a_delta_frame)
   and assert(manager.machine.devices[":maincpu"].spaces["program"])
 local geometry_file
 if geometry_output then
@@ -332,6 +340,15 @@ emu.register_frame_done(function()
   if steer_pulse and frames == 960 then
     steering:set_value(steer_pulse)
     print(string.format("INPUT,960,steer-%d", steer_pulse))
+  end
+  if state7a_delta_frame and frames == state7a_delta_frame then
+    local address = 0x0c08ba
+    local before = ram_space:read_u16(address)
+    local after = (before + state7a_delta) & 0xffff
+    ram_space:write_u16(address, after)
+    assert(ram_space:read_u16(address) == after)
+    print(string.format("STATE7A_DELTA,%d,%06X,%04X,%04X,%d",
+      frames, address, before, after, state7a_delta))
   end
   if record_tap_enabled and frames == 955 then
     record_tap = ram_space:install_write_tap(
