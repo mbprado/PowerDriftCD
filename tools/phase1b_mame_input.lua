@@ -72,7 +72,12 @@ local debug_mode = os.getenv("PDRIFT_DEBUG_WATCH")
 assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
-  or debug_mode == "bsprite")
+  or debug_mode == "bsprite" or debug_mode == "position_math")
+local position_math_phase = os.getenv("PDRIFT_POSITION_MATH_PHASE")
+assert(not position_math_phase or (debug_mode == "position_math"
+  and (position_math_phase == "input" or position_math_phase == "output"
+    or position_math_phase == "both")))
+assert(debug_mode ~= "position_math" or position_math_phase)
 local shared_watch_address = os.getenv("PDRIFT_SHARED_WATCH_ADDR")
   and tonumber(os.getenv("PDRIFT_SHARED_WATCH_ADDR"), 16)
 local shared_watch_until = tonumber(os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or "")
@@ -134,7 +139,7 @@ local state_ready = not state_load
 local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
-  or debug_mode == "bsprite"
+  or debug_mode == "bsprite" or debug_mode == "position_math"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
 local bsprite_write_tap
@@ -326,8 +331,10 @@ emu.register_frame_done(function()
     end
   end
   if (ysprite_sequence_trace or debug_mode == "projection"
-      or debug_mode == "transform") and frames >= 960 and
-      frames <= ((debug_mode == "projection" or debug_mode == "transform")
+      or debug_mode == "transform" or debug_mode == "position_math")
+      and frames >= 960 and
+      frames <= ((debug_mode == "projection" or debug_mode == "transform"
+          or debug_mode == "position_math")
         and sequence_end or ysprite_sequence_end) then
     manager.machine.debugger:command(
       string.format('printf "SEQUENCE_FRAME,%d\\n"', frames))
@@ -660,6 +667,23 @@ emu.register_frame_done(function()
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print(string.format("WATCH_CLEARED,%d", frames))
+  end
+  if debug_mode == "position_math" and frames == 960 then
+    if position_math_phase == "input" or position_math_phase == "both" then
+      local action = 'printf "POSITION_MATH_INPUT pc=%06X a5=%06X a6=%06X base=%04X operand=%04X coefficient=%04X\\n",pc,a5,a6,w@(a5+16),w@a6,w@(a6+2);g'
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x34c1c, "a5==c0840&&a6==80000", action)
+    end
+    if position_math_phase == "output" or position_math_phase == "both" then
+      local action = 'printf "POSITION_MATH_OUTPUT pc=%06X a5=%06X adjusted=%04X\\n",pc,a5,w@(a5+16);g'
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x34c38, "a5==c0840", action)
+    end
+    print("POSITION_MATH_ARMED," .. position_math_phase)
+  end
+  if debug_mode == "position_math" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("POSITION_MATH_CLEARED," .. frames)
   end
   if debug_mode == "projection" and frames == 960 then
     manager.machine.debugger.visible_cpu = manager.machine.devices[":maincpu"]
