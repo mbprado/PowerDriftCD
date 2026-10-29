@@ -78,7 +78,8 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
   or debug_mode == "bsprite" or debug_mode == "position_math"
-  or debug_mode == "position_chain" or debug_mode == "position_offset"
+  or debug_mode == "position_chain" or debug_mode == "position_preadd"
+  or debug_mode == "position_offset"
   or debug_mode == "position_increment")
 local position_increment_phase = os.getenv("PDRIFT_POSITION_INCREMENT_PHASE")
 assert(not position_increment_phase or (debug_mode == "position_increment"
@@ -98,6 +99,11 @@ assert(not position_chain_phase or (debug_mode == "position_chain"
   and (position_chain_phase == "input" or position_chain_phase == "output"
     or position_chain_phase == "both")))
 assert(debug_mode ~= "position_chain" or position_chain_phase)
+local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
+assert(not position_preadd_phase or (debug_mode == "position_preadd"
+  and (position_preadd_phase == "input" or position_preadd_phase == "output"
+    or position_preadd_phase == "both")))
+assert(debug_mode ~= "position_preadd" or position_preadd_phase)
 local position_math_phase = os.getenv("PDRIFT_POSITION_MATH_PHASE")
 assert(not position_math_phase or (debug_mode == "position_math"
   and (position_math_phase == "input" or position_math_phase == "output"
@@ -170,7 +176,8 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "reads" or debug_mode == "ysprite"
   or debug_mode == "projection" or debug_mode == "transform"
   or debug_mode == "bsprite" or debug_mode == "position_math"
-  or debug_mode == "position_chain" or debug_mode == "position_offset"
+  or debug_mode == "position_chain" or debug_mode == "position_preadd"
+  or debug_mode == "position_offset"
   or debug_mode == "position_increment"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
@@ -375,11 +382,13 @@ emu.register_frame_done(function()
   end
   if (ysprite_sequence_trace or debug_mode == "projection"
       or debug_mode == "transform" or debug_mode == "position_math"
-      or debug_mode == "position_chain" or debug_mode == "position_offset"
+      or debug_mode == "position_chain" or debug_mode == "position_preadd"
+      or debug_mode == "position_offset"
       or debug_mode == "position_increment")
       and frames >= 960 and
       frames <= ((debug_mode == "projection" or debug_mode == "transform"
           or debug_mode == "position_math" or debug_mode == "position_chain"
+          or debug_mode == "position_preadd"
           or debug_mode == "position_offset" or debug_mode == "position_increment")
         and sequence_end or ysprite_sequence_end) then
     manager.machine.debugger:command(
@@ -822,6 +831,26 @@ emu.register_frame_done(function()
   if debug_mode == "position_chain" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("POSITION_CHAIN_CLEARED," .. frames)
+  end
+  if debug_mode == "position_preadd" and frames == 960 then
+    if position_preadd_phase == "input" or position_preadd_phase == "both" then
+      local state_action = 'printf "POSITION_PREADD_STATE pc=%06X word86=%04X word7a=%04X word24=%04X word8a=%04X old7c=%04X flag69=%02X\n",pc,w@(a5+86),w@(a5+7a),w@(a5+24),w@(a5+8a),w@(a5+7c),b@(a5+69);g'
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x34e24, "a5==c0840", state_action)
+      local action = 'printf "POSITION_PREADD_BASE pc=%06X timer=%04X old28=%04X\n",pc,w@(a5+00a2),w@(a5+28);g'
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x34ef4, "a5==c0840", action)
+    end
+    if position_preadd_phase == "output" or position_preadd_phase == "both" then
+      local action = 'printf "POSITION_PREADD_OUTPUT pc=%06X d0=%08X value82=%04X\n",pc,d0,w@(a5+82);g'
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x34f1e, "a5==c0840", action)
+    end
+    print("POSITION_PREADD_ARMED," .. position_preadd_phase)
+  end
+  if debug_mode == "position_preadd" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("POSITION_PREADD_CLEARED," .. frames)
   end
   if debug_mode == "position_offset" and frames == 960 then
     if position_increment_trace then
