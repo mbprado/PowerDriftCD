@@ -92,6 +92,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "position_d3"
   or debug_mode == "bridge_gate"
   or debug_mode == "projection_divisor"
+  or debug_mode == "projection_stateful"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
@@ -131,6 +132,11 @@ assert(debug_mode ~= "projection_divisor" or
   (state_load and (projection_divisor_phase == "input"
     or projection_divisor_phase == "output")))
 assert(not projection_divisor_phase or debug_mode == "projection_divisor")
+local projection_stateful_phase = os.getenv("PDRIFT_PROJECTION_STATEFUL_PHASE")
+assert(debug_mode ~= "projection_stateful" or
+  (state_load and (projection_stateful_phase == "input"
+    or projection_stateful_phase == "output")))
+assert(not projection_stateful_phase or debug_mode == "projection_stateful")
 local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
 assert(not position_preadd_phase or (debug_mode == "position_preadd"
   and (position_preadd_phase == "input" or position_preadd_phase == "output"
@@ -213,6 +219,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "position_d3"
   or debug_mode == "bridge_gate"
   or debug_mode == "projection_divisor"
+  or debug_mode == "projection_stateful"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
@@ -420,6 +427,11 @@ emu.register_frame_done(function()
       and frames <= sequence_end then
     manager.machine.debugger:command(
       string.format('printf "PROJECTION_DIV_FRAME,%d\\n"', frames))
+  end
+  if debug_mode == "projection_stateful" and frames >= 960
+      and frames <= sequence_end then
+    manager.machine.debugger:command(
+      string.format('printf "PROJECTION_STATEFUL_FRAME,%d\\n"', frames))
   end
   if debug_mode == "bsprite" and frames <= 982 then
     print(string.format("BSPRITE_FRAME,%d", frames))
@@ -978,6 +990,27 @@ emu.register_frame_done(function()
   if debug_mode == "projection_divisor" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("PROJECTION_DIV_CLEARED," .. frames)
+  end
+  if debug_mode == "projection_stateful" and frames == 960 then
+    if projection_stateful_phase == "input" then
+      print(string.format("PROJECTION_STATEFUL_INITIAL,960,%04X,%04X",
+        ram_space:read_u16(0x0c1d04), ram_space:read_u16(0x0c1d06)))
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33d98, "a5==c1d00",
+          'printf "PROJECTION_STATEFUL_INPUT pc=%06X source16=%04X source18=%04X source1a=%04X global16=%04X global18=%04X global1a=%04X global1c=%04X global1e=%04X global20=%04X coef1sin=%04X coef1cos=%04X coef2sin=%04X coef2cos=%04X screen_y_offset=%04X\\n",pc,w@(a5+16),w@(a5+18),w@(a5+1a),w@(a4+16),w@(a4+18),w@(a4+1a),w@(a4+1c),w@(a4+1e),w@(a4+20),w@(a1-600),w@a1,w@(a2-600),w@a2,w@cea3e;g')
+    else
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33e8e, "a5==c1d00",
+          'printf "PROJECTION_STATEFUL_COPY pc=%06X slot=%04X x=%04X y=%04X oldx=%04X oldy=%04X listx=%04X listy=%04X listoldx=%04X listoldy=%04X\\n",pc,d0,w@(a5+4),w@(a5+6),w@(a5+8),w@(a5+a),w@(a0+(d0&ffff)+4),w@(a0+(d0&ffff)+6),w@(a0+(d0&ffff)+8),w@(a0+(d0&ffff)+a);g')
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33e9a, "a5==c1d00",
+          'printf "PROJECTION_STATEFUL_OUTPUT pc=%06X x=%04X y=%04X\\n",pc,w@(a5+4),w@(a5+6);g')
+    end
+    print("PROJECTION_STATEFUL_ARMED," .. projection_stateful_phase .. ",960")
+  end
+  if debug_mode == "projection_stateful" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("PROJECTION_STATEFUL_CLEARED," .. frames)
   end
   if debug_mode == "position_branch_writers" and
       frames == (state_load and 951 or 1) then
