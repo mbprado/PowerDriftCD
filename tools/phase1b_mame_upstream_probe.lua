@@ -14,6 +14,7 @@ assert(mode == "table_boot" or mode == "state_inputs" or
        mode == "state24_inputs" or mode == "state24_targets" or
        mode == "state24_order" or mode == "state24_source_dev" or
        mode == "state24_source_inputs" or mode == "state24_source_targets" or
+       mode == "state24_fraction_inputs" or
        mode == "state24_forward_inputs" or mode == "state24_forward_targets" or
        mode == "state24_forward_order")
 local cpu = assert(manager.machine.devices[":maincpu"])
@@ -187,6 +188,9 @@ emu.register_frame_done(function()
     elseif mode == "state24_source_inputs" then
       breakpoint = debugger:bpset(0x343c4, "a5==c0840",
         'printf "STATE24_SOURCE pc=%06X flag26=%02X flag54=%02X flag55=%02X flag47=%02X word80=%04X word8c=%04X flag69=%02X flag5e=%02X word8e=%04X oldglobal=%04X\\n",pc,b@cea26,b@(a5+54),b@(a5+55),b@(a5+47),w@(a5+80),w@(a5+8c),b@(a5+69),b@(a5+5e),w@(a5+8e),w@cea12;g')
+    elseif mode == "state24_fraction_inputs" then
+      breakpoint = debugger:bpset(0x343c4, "a5==c0840",
+        'printf "STATE24_SOURCE pc=%06X flag26=%02X flag54=%02X flag55=%02X flag47=%02X word80=%04X word8c=%04X flag69=%02X flag5e=%02X word8e=%04X oldglobal=%04X oldfraction=%08X oldphase=%04X\\n",pc,b@cea26,b@(a5+54),b@(a5+55),b@(a5+47),w@(a5+80),w@(a5+8c),b@(a5+69),b@(a5+5e),w@(a5+8e),w@cea12,d@cea14,w@cea00;g')
     elseif mode == "state24_source_targets" then
       breakpoint = debugger:bpset(0x34478, "a5==c0840",
         'printf "STATE24_SOURCE_TARGET pc=%06X desired=%04X limit=%04X\\n",pc,d0,d1;g')
