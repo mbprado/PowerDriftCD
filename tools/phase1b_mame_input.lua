@@ -102,7 +102,7 @@ assert(debug_mode ~= "position_chain" or position_chain_phase)
 local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
 assert(not position_preadd_phase or (debug_mode == "position_preadd"
   and (position_preadd_phase == "input" or position_preadd_phase == "output"
-    or position_preadd_phase == "both")))
+    or position_preadd_phase == "both" or position_preadd_phase == "prior")))
 assert(debug_mode ~= "position_preadd" or position_preadd_phase)
 local position_math_phase = os.getenv("PDRIFT_POSITION_MATH_PHASE")
 assert(not position_math_phase or (debug_mode == "position_math"
@@ -837,6 +837,9 @@ emu.register_frame_done(function()
       local state_action = 'printf "POSITION_PREADD_STATE pc=%06X word86=%04X word7a=%04X word24=%04X word8a=%04X old7c=%04X flag69=%02X\n",pc,w@(a5+86),w@(a5+7a),w@(a5+24),w@(a5+8a),w@(a5+7c),b@(a5+69);g'
       main_record_breakpoints[#main_record_breakpoints + 1] =
         cpu_debug:bpset(0x34e24, "a5==c0840", state_action)
+    end
+    if position_preadd_phase == "input" or position_preadd_phase == "both"
+        or position_preadd_phase == "prior" then
       local action = 'printf "POSITION_PREADD_BASE pc=%06X timer=%04X old28=%04X\n",pc,w@(a5+00a2),w@(a5+28);g'
       main_record_breakpoints[#main_record_breakpoints + 1] =
         cpu_debug:bpset(0x34ef4, "a5==c0840", action)
