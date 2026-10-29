@@ -55,10 +55,12 @@ def trace(trial, phase, pulse):
     return found, digest(path)
 
 
-def compute(inputs, rom):
+def compute(inputs, rom, frames=None):
     assert len(rom) == 0x80000
+    if frames is None:
+        frames = FRAMES
     result = []
-    for step, frame in enumerate(FRAMES):
+    for step, frame in enumerate(frames):
         d0, d3, state80, state7e = inputs["pre"][step][1]
         (index_raw,) = inputs["index"][step][1]
         (base,) = inputs["base"][step][1]
