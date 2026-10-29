@@ -10,6 +10,8 @@
 
 **Verified by execution, projection and list follow-ups:** a [held-out pulse-56 test](docs/experiments/2026-10-29-projection-divisor-guard-result.md) matched 20/20 raw divisors and 20/20 accept/skip decisions in each of three MAME runs. It corrected the replay's guard order: the arcade checks the signed divisor before adding `$0080`. A separate [held-out pulse-72 test](docs/experiments/2026-10-29-stateful-projection-copy-result.md) matched 196/196 object-coordinate, copy-decision and current/prior shared-list-pair fields in each of three runs, including three skipped updates that retained the previous coordinates. A [held-out pulse-116 test](docs/experiments/2026-10-29-projection-slot-selection-result.md) then matched 84/84 local copy-slot/address fields in each of three runs from pre-copy count/base inputs. The earlier road-record failures still stand. Predicting the count and active buffer from earlier object/frame state, and completing an earlier-state-to-road-record model, remain open.
 
+**Verified by execution, cross-CPU count boundary:** a [held-out pulse-124 test](docs/experiments/2026-10-29-shared-list-count-flow-result.md) predicted the target object's entry count `$0027` from the earlier reset and 39 main/Sub-Y writes in three fresh MAME runs. The count was `$0028` by the later pre-lock/copy stage, so entry count cannot be used directly as the list slot. Sub-Y interleaving and buffer selection still require a timed producer model.
+
 ## Principles
 - Original console hardware is the target; no expansion CPU/RAM or emulator-only shortcuts.
 - Arcade-feel first: banked tracks, elevation, camera motion, controls, opponents.
