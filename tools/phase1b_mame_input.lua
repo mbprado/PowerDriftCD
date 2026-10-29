@@ -95,6 +95,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "projection_stateful"
   or debug_mode == "projection_slot"
   or debug_mode == "projection_count_flow"
+  or debug_mode == "projection_lock_interval"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
@@ -234,6 +235,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "projection_stateful"
   or debug_mode == "projection_slot"
   or debug_mode == "projection_count_flow"
+  or debug_mode == "projection_lock_interval"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
@@ -456,6 +458,11 @@ emu.register_frame_done(function()
       and frames <= sequence_end then
     manager.machine.debugger:command(
       string.format('printf "PROJECTION_COUNT_FRAME,%d\\n"', frames))
+  end
+  if debug_mode == "projection_lock_interval" and frames >= 960
+      and frames <= 962 then
+    manager.machine.debugger:command(
+      string.format('printf "PROJECTION_LOCK_FRAME,%d\\n"', frames))
   end
   if debug_mode == "bsprite" and frames <= 982 then
     print(string.format("BSPRITE_FRAME,%d", frames))
@@ -1084,6 +1091,40 @@ emu.register_frame_done(function()
   if debug_mode == "projection_count_flow" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("PROJECTION_COUNT_CLEARED," .. frames)
+  end
+  if debug_mode == "projection_lock_interval" and frames == 960 then
+    for _, tag in ipairs({ "maincpu", "subx", "suby" }) do
+      local device = assert(manager.machine.devices[":" .. tag])
+      local debugger = assert(device.debug)
+      local space = assert(device.spaces["program"])
+      for _, item in ipairs({ { "COUNT", 0x0cfcf0, 2 },
+                              { "LOCK", 0x0ceb43, 1 } }) do
+        local action = string.format(
+          'printf "PROJECTION_LOCK_WRITE cpu=%s field=%s pc=%%06X addr=%%06X data=%%08X count=%%04X lock=%%02X\\n",pc,wpaddr,wpdata,w@cfcf0,b@ceb43;g',
+          tag, item[1])
+        local condition = item[1] == "LOCK"
+          and "wpdata==0 || b@ceb43==0" or "1"
+        local index = debugger:wpset(space, "w", item[2], item[3], condition, action)
+        watchpoints[#watchpoints + 1] = { debugger, index }
+      end
+    end
+    for _, item in ipairs({ { 0x33d1e, "ENTRY" },
+                            { 0x33e68, "TAS" },
+                            { 0x33e70, "LOCKED" },
+                            { 0x33e8e, "COPY" },
+                            { 0x33e94, "RELEASE" } }) do
+      local action = string.format(
+        'printf "PROJECTION_LOCK_STAGE name=%s pc=%%06X count=%%04X lock=%%02X a5=%%06X\\n",pc,w@cfcf0,b@ceb43,a5;g',
+        item[2])
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(item[1], "a5==c1d00", action)
+    end
+    print("PROJECTION_LOCK_ARMED,maincpu+subx+suby,960")
+  end
+  if debug_mode == "projection_lock_interval" and frames == 962 then
+    for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("PROJECTION_LOCK_CLEARED," .. frames)
   end
   if debug_mode == "position_branch_writers" and
       frames == (state_load and 951 or 1) then
