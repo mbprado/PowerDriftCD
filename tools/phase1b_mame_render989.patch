@@ -1,0 +1,42 @@
+--- a/src/mame/sega/segaybd.cpp
++++ b/src/mame/sega/segaybd.cpp
+@@ -479,0 +480,36 @@
++	if (char const *const capture_dir = std::getenv("PDRIFT_YBITMAP_DIR"))
++	{
++		uint64_t const frame = screen.frame_number();
++		if (frame >= 988 && frame <= 995)
++		{
++			int next = 0;
++			int first = -1;
++			int count = 0;
++			int hidden = 0;
++			uint8_t visited[0x1000] = {};
++			auto &space = m_subx->space(AS_PROGRAM);
++			while (!visited[next] && count < 0x1000)
++			{
++				uint16_t const word0 = space.read_word(0x180000 + next * 16);
++				if (word0 & 0x8000)
++					break;
++				visited[next] = 1;
++				if (next && first < 0)
++					first = next;
++				if (word0 & 0x5000)
++					++hidden;
++				++count;
++				next = space.read_word(0x180000 + next * 16 + 14) & 0xfff;
++			}
++			char path[1024];
++			std::snprintf(path, sizeof(path), "%s/ylist-%04llu.csv",
++				capture_dir, static_cast<unsigned long long>(frame));
++			std::FILE *const out = std::fopen(path, "wb");
++			if (!out)
++				fatalerror("Cannot open Y-list capture: %s", path);
++			std::fprintf(out, "frame,first_slot,count,hidden,next_slot\n%llu,%03X,%d,%d,%03X\n",
++				static_cast<unsigned long long>(frame), first, count, hidden, next);
++			if (std::fclose(out))
++				fatalerror("Cannot close Y-list capture: %s", path);
++		}
++	}
+@@ -485 +521 @@
+-		if (frame >= 966 && frame <= 968)
++		if (frame >= 988 && frame <= 995)
