@@ -7,6 +7,10 @@ local screen = assert(manager.machine.screens[":screen"])
 local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
 local geometry_output = os.getenv("PDRIFT_GEOMETRY_SAMPLE_DIR")
+local bridge_input_mask = os.getenv("PDRIFT_BRIDGE_INPUT_MASK") == "1"
+assert(not bridge_input_mask or (geometry_output
+  and os.getenv("PDRIFT_SEQUENCE_END_FRAME") == "988"
+  and os.getenv("PDRIFT_POSITION_CHAIN_PHASE") == "input"))
 local list_output = os.getenv("PDRIFT_SHARED_LIST_DIR")
 local projection_input_output = os.getenv("PDRIFT_PROJECTION_INPUT_DIR")
 local sequence_end = tonumber(os.getenv("PDRIFT_SEQUENCE_END_FRAME") or "970")
@@ -544,6 +548,7 @@ emu.register_frame_done(function()
     for _, offset in ipairs({ 0x16, 0x18, 0x1a, 0x1c, 0x1e, 0x20 }) do
       globals[#globals + 1] = ram_space:read_u16(0x0c0080 + offset)
     end
+    if bridge_input_mask and frames == 988 then globals[4] = 0 end
     local angle2 = ram_space:read_u16(0x0c0080 + 0x24)
     local angle1 = ram_space:read_u16(0x0c0080 + 0x26)
     local lookup1 = 0x0ef6 + 2 * angle1
@@ -565,8 +570,10 @@ emu.register_frame_done(function()
         ram_space:read_u16(object + 0x16),
         ram_space:read_u16(object + 0x18),
         ram_space:read_u16(object + 0x1a),
-        ram_space:read_u16(object + 0x04),
-        ram_space:read_u16(object + 0x06),
+        bridge_input_mask and frames == 988 and 0
+          or ram_space:read_u16(object + 0x04),
+        bridge_input_mask and frames == 988 and 0
+          or ram_space:read_u16(object + 0x06),
       }
       for _, value in ipairs(globals) do values[#values + 1] = value end
       for _, value in ipairs(coefficients) do values[#values + 1] = value end
@@ -575,6 +582,9 @@ emu.register_frame_done(function()
         table.unpack(values))))
     end
     print(string.format("GEOMETRY_SAMPLES,%d,12,%06X", frames, table_base))
+    if bridge_input_mask and frames == 988 then
+      print("BRIDGE_INPUT_MASKED,988,global1c+projected4+projected6")
+    end
     if frames == sequence_end then assert(geometry_file:close()) end
   end
   if list_output and frames >= 960 and frames <= sequence_end then
