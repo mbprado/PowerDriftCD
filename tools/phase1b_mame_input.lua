@@ -8,8 +8,13 @@ local output = assert(os.getenv("PDRIFT_SNAPSHOT_DIR"))
 local ram_output = os.getenv("PDRIFT_RAM_DIR")
 local geometry_output = os.getenv("PDRIFT_GEOMETRY_SAMPLE_DIR")
 local list_output = os.getenv("PDRIFT_SHARED_LIST_DIR")
+local projection_input_output = os.getenv("PDRIFT_PROJECTION_INPUT_DIR")
 local sequence_end = tonumber(os.getenv("PDRIFT_SEQUENCE_END_FRAME") or "970")
 assert(sequence_end and sequence_end >= 970 and sequence_end <= 1000)
+local projection_input_frame = tonumber(os.getenv("PDRIFT_PROJECTION_INPUT_FRAME") or "988")
+assert(not projection_input_output or
+  (projection_input_frame and projection_input_frame >= 960
+    and projection_input_frame <= sequence_end))
 local rotate_output = os.getenv("PDRIFT_ROTATE_DIR")
 local swap_output = os.getenv("PDRIFT_SWAP_DIR")
 local rotate_override = os.getenv("PDRIFT_ROTATE_OVERRIDE")
@@ -135,6 +140,7 @@ assert(not os.getenv("PDRIFT_YSPRITE_SEQUENCE_END_FRAME") or
   (ysprite_sequence_trace and ysprite_sequence_end
     and ysprite_sequence_end >= 971 and ysprite_sequence_end <= 1000))
 local ram_space = (ram_output or debug_mode or geometry_output or list_output
+  or projection_input_output
   or state7a_delta_frame)
   and assert(manager.machine.devices[":maincpu"].spaces["program"])
 local geometry_file
@@ -524,6 +530,16 @@ emu.register_frame_done(function()
   end
   if list_output and frames >= 960 and frames <= sequence_end then
     capture_shared_list(frames)
+  end
+  if projection_input_output and frames == projection_input_frame then
+    local path = string.format("%s/projection-input-%04d.csv",
+      projection_input_output, frames)
+    local file = assert(io.open(path, "w"))
+    assert(file:write(string.format(
+      "callback,offset_source,prior_horizontal_offset\n%d,%04X,%04X\n",
+      frames, ram_space:read_u16(0x0c00ae), ram_space:read_u16(0x0c0098))))
+    assert(file:close())
+    print(string.format("PROJECTION_INPUT,%d,%s", frames, path))
   end
   if debug_mode == "1" and frames == 960 then
     local action = 'printf "WATCH addr=%06X data=%08X pc=%06X sp=%06X\\n",wpaddr,wpdata,pc,a7;g'
