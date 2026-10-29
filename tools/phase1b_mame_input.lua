@@ -94,6 +94,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "projection_divisor"
   or debug_mode == "projection_stateful"
   or debug_mode == "projection_slot"
+  or debug_mode == "projection_count_flow"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
@@ -143,6 +144,11 @@ assert(debug_mode ~= "projection_slot" or
   (state_load and (projection_slot_phase == "input"
     or projection_slot_phase == "output")))
 assert(not projection_slot_phase or debug_mode == "projection_slot")
+local projection_count_phase = os.getenv("PDRIFT_PROJECTION_COUNT_PHASE")
+assert(debug_mode ~= "projection_count_flow" or
+  (state_load and (projection_count_phase == "input"
+    or projection_count_phase == "output")))
+assert(not projection_count_phase or debug_mode == "projection_count_flow")
 local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
 assert(not position_preadd_phase or (debug_mode == "position_preadd"
   and (position_preadd_phase == "input" or position_preadd_phase == "output"
@@ -227,6 +233,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "projection_divisor"
   or debug_mode == "projection_stateful"
   or debug_mode == "projection_slot"
+  or debug_mode == "projection_count_flow"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
@@ -444,6 +451,11 @@ emu.register_frame_done(function()
       and frames <= sequence_end then
     manager.machine.debugger:command(
       string.format('printf "PROJECTION_SLOT_FRAME,%d\\n"', frames))
+  end
+  if debug_mode == "projection_count_flow" and frames >= 960
+      and frames <= sequence_end then
+    manager.machine.debugger:command(
+      string.format('printf "PROJECTION_COUNT_FRAME,%d\\n"', frames))
   end
   if debug_mode == "bsprite" and frames <= 982 then
     print(string.format("BSPRITE_FRAME,%d", frames))
@@ -1039,6 +1051,39 @@ emu.register_frame_done(function()
   if debug_mode == "projection_slot" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("PROJECTION_SLOT_CLEARED," .. frames)
+  end
+  if debug_mode == "projection_count_flow" and frames == 960 then
+    if projection_count_phase == "input" then
+      print(string.format("PROJECTION_COUNT_INITIAL,960,%04X",
+        ram_space:read_u16(0x0cfcf0)))
+      for _, tag in ipairs({ "maincpu", "subx", "suby" }) do
+        local device = assert(manager.machine.devices[":" .. tag])
+        local debugger = assert(device.debug)
+        local space = assert(device.spaces["program"])
+        local action = string.format(
+          'printf "PROJECTION_COUNT_WRITE cpu=%s pc=%%06X data=%%04X\\n",pc,wpdata;g', tag)
+        local index = debugger:wpset(space, "w", 0x0cfcf0, 2, "1", action)
+        watchpoints[#watchpoints + 1] = { debugger, index }
+      end
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33d1e, "a5==c1d00",
+          'printf "PROJECTION_COUNT_TARGET pc=%06X\\n",pc;quit')
+    else
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33d1e, "a5==c1d00",
+          'printf "PROJECTION_COUNT_ENTRY pc=%06X count=%04X\\n",pc,w@cfcf0;g')
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33e68, "a5==c1d00",
+          'printf "PROJECTION_COUNT_PRELOCK pc=%06X count=%04X\\n",pc,w@cfcf0;g')
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33e8e, "a5==c1d00",
+          'printf "PROJECTION_COUNT_COPY pc=%06X count=%04X slot=%04X\\n",pc,w@cfcf0,d0&ffff;g')
+    end
+    print("PROJECTION_COUNT_ARMED," .. projection_count_phase .. ",960")
+  end
+  if debug_mode == "projection_count_flow" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("PROJECTION_COUNT_CLEARED," .. frames)
   end
   if debug_mode == "position_branch_writers" and
       frames == (state_load and 951 or 1) then
