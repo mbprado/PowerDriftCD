@@ -39,9 +39,12 @@ def project(row, horizontal_offset_at_projection):
     depth_y = signed16(signed32(sine2 * z - cosine2 * rotated_x) >> 9)
     horizontal = signed16(horizontal_offset_at_projection + rotated_y)
     vertical = signed16(h("global1a") + depth_y)
-    divisor = signed16(h("global16") + depth_x + 0x80)
-    if divisor <= 0:
+    raw_divisor = signed16(h("global16") + depth_x)
+    if raw_divisor <= 0:
         return None
+    divisor = signed16(raw_divisor + 0x80)
+    if divisor <= 0:
+        raise ValueError("positive projection divisor overflowed after bias")
     quotient = min(32767, 0x20000 // divisor)
     projected_x = signed16(signed32(horizontal * quotient) >> 10)
     projected_y = signed16(- (signed32(vertical * quotient) >> 10)

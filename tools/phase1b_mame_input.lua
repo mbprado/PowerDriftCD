@@ -91,6 +91,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "position_carry"
   or debug_mode == "position_d3"
   or debug_mode == "bridge_gate"
+  or debug_mode == "projection_divisor"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
@@ -125,6 +126,11 @@ assert(debug_mode ~= "position_d3" or
     and position_d3_low <= 0x7fff
     and (position_d3_phase == "both" or position_d3_phase == "output")))
 assert(not position_d3_low or debug_mode == "position_d3")
+local projection_divisor_phase = os.getenv("PDRIFT_PROJECTION_DIVISOR_PHASE")
+assert(debug_mode ~= "projection_divisor" or
+  (state_load and (projection_divisor_phase == "input"
+    or projection_divisor_phase == "output")))
+assert(not projection_divisor_phase or debug_mode == "projection_divisor")
 local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
 assert(not position_preadd_phase or (debug_mode == "position_preadd"
   and (position_preadd_phase == "input" or position_preadd_phase == "output"
@@ -206,6 +212,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "position_carry"
   or debug_mode == "position_d3"
   or debug_mode == "bridge_gate"
+  or debug_mode == "projection_divisor"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
@@ -408,6 +415,11 @@ emu.register_frame_done(function()
   if debug_mode == "bridge_gate" and frames >= 992 and frames <= 998 then
     manager.machine.debugger:command(
       string.format('printf "BRIDGE_GATE_FRAME,%d\\n"', frames))
+  end
+  if debug_mode == "projection_divisor" and frames >= 960
+      and frames <= sequence_end then
+    manager.machine.debugger:command(
+      string.format('printf "PROJECTION_DIV_FRAME,%d\\n"', frames))
   end
   if debug_mode == "bsprite" and frames <= 982 then
     print(string.format("BSPRITE_FRAME,%d", frames))
@@ -944,6 +956,28 @@ emu.register_frame_done(function()
   if debug_mode == "bridge_gate" and frames == 998 then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("BRIDGE_GATE_CLEARED,998")
+  end
+  if debug_mode == "projection_divisor" and frames == 960 then
+    if projection_divisor_phase == "input" then
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33d1e, "a5==c1d00",
+          'printf "PROJECTION_DIV_ENTRY pc=%06X a5=%06X\\n",pc,a5;g')
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33d98, "a5==c1d00",
+          'printf "PROJECTION_DIV_INPUT pc=%06X source16=%04X source18=%04X source1a=%04X global16=%04X global1c=%04X global1e=%04X global20=%04X coef1sin=%04X coef1cos=%04X coef2sin=%04X coef2cos=%04X\\n",pc,w@(a5+16),w@(a5+18),w@(a5+1a),w@(a4+16),w@(a4+1c),w@(a4+1e),w@(a4+20),w@(a1-600),w@a1,w@(a2-600),w@a2;g')
+    else
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33e00, "a5==c1d00",
+          'printf "PROJECTION_DIV_OUTPUT pc=%06X d2=%04X\\n",pc,d2;g')
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(0x33e04, "a5==c1d00",
+          'printf "PROJECTION_DIV_ACCEPT pc=%06X\\n",pc;g')
+    end
+    print("PROJECTION_DIV_ARMED," .. projection_divisor_phase .. ",960")
+  end
+  if debug_mode == "projection_divisor" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("PROJECTION_DIV_CLEARED," .. frames)
   end
   if debug_mode == "position_branch_writers" and
       frames == (state_load and 951 or 1) then
