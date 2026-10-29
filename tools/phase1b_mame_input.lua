@@ -80,6 +80,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "bsprite" or debug_mode == "position_math"
   or debug_mode == "position_chain" or debug_mode == "position_preadd"
   or debug_mode == "position_carry"
+  or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
 local position_increment_phase = os.getenv("PDRIFT_POSITION_INCREMENT_PHASE")
@@ -184,6 +185,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "bsprite" or debug_mode == "position_math"
   or debug_mode == "position_chain" or debug_mode == "position_preadd"
   or debug_mode == "position_carry"
+  or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
@@ -369,6 +371,10 @@ print("CAPTURE_PROFILE=" .. capture_profile)
 emu.register_frame_done(function()
   if not state_ready then return end
   frames = frames + 1
+  if debug_mode == "position_branch_writers" and frames <= 1000 then
+    manager.machine.debugger:command(
+      string.format('printf "POSITION_BRANCH_FRAME,%d\\n"', frames))
+  end
   if debug_mode == "bsprite" and frames <= 982 then
     print(string.format("BSPRITE_FRAME,%d", frames))
   end
@@ -865,6 +871,23 @@ emu.register_frame_done(function()
   if debug_mode == "position_carry" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("POSITION_CARRY_CLEARED," .. frames)
+  end
+  if debug_mode == "position_branch_writers" and
+      frames == (state_load and 951 or 1) then
+    for _, tag in ipairs({ "maincpu", "subx", "suby" }) do
+      local device = assert(manager.machine.devices[":" .. tag])
+      local debugger = assert(device.debug)
+      local space = assert(device.spaces["program"])
+      local action = string.format(
+        'printf "POSITION_BRANCH_WRITE cpu=%s pc=%%06X addr=%%06X data=%%08X\\n",pc,wpaddr,wpdata;g', tag)
+      local index = debugger:wpset(space, "w", 0x0c08be, 4, "1", action)
+      watchpoints[#watchpoints + 1] = { debugger, index }
+    end
+    print("POSITION_BRANCH_WRITERS_ARMED,maincpu+subx+suby,0C08BE,4," .. frames)
+  end
+  if debug_mode == "position_branch_writers" and frames == sequence_end then
+    for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
+    print("POSITION_BRANCH_WRITERS_CLEARED," .. frames)
   end
   if debug_mode == "position_preadd" and frames == 960 then
     if position_preadd_phase == "input" or position_preadd_phase == "both" then
