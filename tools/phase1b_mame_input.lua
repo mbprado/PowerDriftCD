@@ -90,6 +90,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "position_chain" or debug_mode == "position_preadd"
   or debug_mode == "position_carry"
   or debug_mode == "position_d3"
+  or debug_mode == "bridge_gate"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
@@ -204,6 +205,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "position_chain" or debug_mode == "position_preadd"
   or debug_mode == "position_carry"
   or debug_mode == "position_d3"
+  or debug_mode == "bridge_gate"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
@@ -402,6 +404,10 @@ emu.register_frame_done(function()
       and frames >= 986 and frames <= 994 then
     manager.machine.debugger:command(
       string.format('printf "BRIDGE_FRAME,%d\\n"', frames))
+  end
+  if debug_mode == "bridge_gate" and frames >= 992 and frames <= 998 then
+    manager.machine.debugger:command(
+      string.format('printf "BRIDGE_GATE_FRAME,%d\\n"', frames))
   end
   if debug_mode == "bsprite" and frames <= 982 then
     print(string.format("BSPRITE_FRAME,%d", frames))
@@ -922,6 +928,22 @@ emu.register_frame_done(function()
   if debug_mode == "position_d3" and frames == 962 then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("POSITION_D3_CLEARED,962")
+  end
+  if debug_mode == "bridge_gate" and frames == 992 then
+    for _, item in ipairs({
+        { 0x33d1e, 'printf "BRIDGE_GATE_ENTRY pc=%06X a5=%06X source16=%04X source18=%04X global1c=%04X\\n",pc,a5,w@(a5+16),w@(a5+18),w@(a4+1c);g' },
+        { 0x33e00, 'printf "BRIDGE_GATE_DIVISOR pc=%06X d2=%08X\\n",pc,d2;g' },
+        { 0x33e58, 'printf "BRIDGE_GATE_PROJECTED pc=%06X x=%08X y=%04X\\n",pc,d0,w@(a5+6);g' },
+        { 0x33e9a, 'printf "BRIDGE_GATE_RETURN pc=%06X x=%04X y=%04X\\n",pc,w@(a5+4),w@(a5+6);g' },
+      }) do
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(item[1], "a5==c1d00", item[2])
+    end
+    print("BRIDGE_GATE_ARMED,992,0C1D00")
+  end
+  if debug_mode == "bridge_gate" and frames == 998 then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("BRIDGE_GATE_CLEARED,998")
   end
   if debug_mode == "position_branch_writers" and
       frames == (state_load and 951 or 1) then
