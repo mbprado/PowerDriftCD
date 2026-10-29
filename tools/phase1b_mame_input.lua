@@ -82,6 +82,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "bsprite" or debug_mode == "position_math"
   or debug_mode == "position_chain" or debug_mode == "position_preadd"
   or debug_mode == "position_carry"
+  or debug_mode == "position_d3"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
@@ -108,6 +109,14 @@ local optional_add_word = os.getenv("PDRIFT_POSITION_OPTIONAL_ADD")
 assert(not os.getenv("PDRIFT_POSITION_OPTIONAL_ADD") or
   (debug_mode == "position_chain" and state_load and optional_add_word
     and optional_add_word >= 1 and optional_add_word <= 0x7fff))
+local position_d3_low = os.getenv("PDRIFT_POSITION_D3_LOW")
+  and tonumber(os.getenv("PDRIFT_POSITION_D3_LOW"), 16)
+local position_d3_phase = os.getenv("PDRIFT_POSITION_D3_PHASE")
+assert(debug_mode ~= "position_d3" or
+  (state_load and position_d3_low and position_d3_low >= 1
+    and position_d3_low <= 0x7fff
+    and (position_d3_phase == "both" or position_d3_phase == "output")))
+assert(not position_d3_low or debug_mode == "position_d3")
 local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
 assert(not position_preadd_phase or (debug_mode == "position_preadd"
   and (position_preadd_phase == "input" or position_preadd_phase == "output"
@@ -187,6 +196,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "bsprite" or debug_mode == "position_math"
   or debug_mode == "position_chain" or debug_mode == "position_preadd"
   or debug_mode == "position_carry"
+  or debug_mode == "position_d3"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
@@ -376,6 +386,10 @@ emu.register_frame_done(function()
   if debug_mode == "position_branch_writers" and frames <= sequence_end then
     manager.machine.debugger:command(
       string.format('printf "POSITION_BRANCH_FRAME,%d\\n"', frames))
+  end
+  if debug_mode == "position_d3" and frames >= 960 and frames <= 962 then
+    manager.machine.debugger:command(
+      string.format('printf "POSITION_D3_FRAME,%d\\n"', frames))
   end
   if debug_mode == "bsprite" and frames <= 982 then
     print(string.format("BSPRITE_FRAME,%d", frames))
@@ -873,6 +887,22 @@ emu.register_frame_done(function()
   if debug_mode == "position_carry" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("POSITION_CARRY_CLEARED," .. frames)
+  end
+  if debug_mode == "position_d3" and frames == 960 then
+    local action = position_d3_phase == "both"
+      and string.format('printf "POSITION_D3_PRE pc=%%06X d0=%%08X d3=%%08X timer=%%04X state80=%%04X state7e=%%04X\\n",pc,d0,d3,w@(a5+a2),w@(a5+80),w@(a5+7e);d3=(d3&ffff0000)|%04X;printf "POSITION_D3_POST pc=%%06X d3=%%08X\\n",pc,d3;g', position_d3_low)
+      or string.format('d3=(d3&ffff0000)|%04X;g', position_d3_low)
+    main_record_breakpoints[#main_record_breakpoints + 1] =
+      cpu_debug:bpset(0x34fa4, "a5==c0840", action)
+    main_record_breakpoints[#main_record_breakpoints + 1] =
+      cpu_debug:bpset(0x34fda, "a5==c0840",
+        'printf "POSITION_D3_OUTPUT pc=%06X d0=%08X value=%04X\\n",pc,d0,w@(a5+28);g')
+    print(string.format("POSITION_D3_ARMED,%s,%04X,960", position_d3_phase,
+      position_d3_low))
+  end
+  if debug_mode == "position_d3" and frames == 962 then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("POSITION_D3_CLEARED,962")
   end
   if debug_mode == "position_branch_writers" and
       frames == (state_load and 951 or 1) then
