@@ -10,7 +10,9 @@ local geometry_output = os.getenv("PDRIFT_GEOMETRY_SAMPLE_DIR")
 local list_output = os.getenv("PDRIFT_SHARED_LIST_DIR")
 local projection_input_output = os.getenv("PDRIFT_PROJECTION_INPUT_DIR")
 local sequence_end = tonumber(os.getenv("PDRIFT_SEQUENCE_END_FRAME") or "970")
-assert(sequence_end and sequence_end >= 970 and sequence_end <= 1000)
+local branch_writer_mode = os.getenv("PDRIFT_DEBUG_WATCH") == "position_branch_writers"
+assert(sequence_end and sequence_end >= 970
+  and sequence_end <= (branch_writer_mode and 2000 or 1000))
 local projection_input_frame = tonumber(os.getenv("PDRIFT_PROJECTION_INPUT_FRAME") or "988")
 assert(not projection_input_output or
   (projection_input_frame and projection_input_frame >= 960
@@ -371,7 +373,7 @@ print("CAPTURE_PROFILE=" .. capture_profile)
 emu.register_frame_done(function()
   if not state_ready then return end
   frames = frames + 1
-  if debug_mode == "position_branch_writers" and frames <= 1000 then
+  if debug_mode == "position_branch_writers" and frames <= sequence_end then
     manager.machine.debugger:command(
       string.format('printf "POSITION_BRANCH_FRAME,%d\\n"', frames))
   end
