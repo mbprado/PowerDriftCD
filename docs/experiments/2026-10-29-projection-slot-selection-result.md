@@ -1,0 +1,17 @@
+# Phase 1B: held-out projection list-slot selection
+
+**PASS — verified by execution in MAME 0.289:** the frozen pulse-116 model predicted all **84/84 scored fields in each of three independent output-only runs**. It predicted 20 copy/no-copy decisions, and for 16 copies the list count, active base, 16-byte slot offset and effective record address. Four late updates made no copy. Each run launched MAME separately from the same private callback-950 state; no cached output counted as a repetition.
+
+The [pretarget plan](2026-10-29-projection-slot-selection-plan.md) and predictor were committed as `7bde0bd` before target capture. The frozen private JSON SHA-256 remains `d5e78bfa14512abda1fd5ad586959f10a5f2ad0db25c21f75f5fad5f533fd3bc`. The score is deliberately narrow: count and base were supplied by an input-only breakpoint at `$033E68`, before the copy path; the model computed `slot = count << 4` and `address = base + slot`. The output breakpoint at `$033E8E` observed the actual copy offset, base, count and record address. Presence or absence was scored at all odd markers 961–999.
+
+| Fresh target directory under `build/private/` | Debug log SHA-256 | Control log SHA-256 | Score |
+| --- | --- | --- | --- |
+| `phase1b-projection-slot116-target-r1/` | `b06b21ba8c3ba32786f1c375e76454e908e520050ffe6126a38cfb22f53f05dc` | `e7fa770cb58310631e5011891c5a737f0967d804f1e80064a6ca8b0dfc4ab8e4` | 84/84 |
+| `phase1b-projection-slot116-target-r2/` | `b06b21ba8c3ba32786f1c375e76454e908e520050ffe6126a38cfb22f53f05dc` | `dbc6a27cd30c0483dd27a3f99c1fb79a63c330fd01d04d45024a0b68094a5147` | 84/84 |
+| `phase1b-projection-slot116-target-r3/` | `b06b21ba8c3ba32786f1c375e76454e908e520050ffe6126a38cfb22f53f05dc` | `a1edfae857062240150b58350335cd3658184233f6d13fe30cf802d62c4b926b` | 84/84 |
+
+**Verified by execution for this window:** accepted copies occurred at markers 961–991. The observed pre-copy counts ranged `$0022`–`$0029`, yielding slot offsets `$0220`–`$0290`; the active base alternated between `$0C8000` and `$0C9800` on the 16 accepted markers. The word-sized `D0` index was essential: the debugger sometimes displayed unrelated upper bits in the full register, while the copy instruction used `D0.w`. The target probe masked the observed offset accordingly. No capacity-limit path was exercised.
+
+**Reproduction:** run the exact MAME command in the pretarget plan from each fresh ignored target directory, then execute `python3 tools/phase1b_projection_slot_predict.py validate build/private/phase1b-projection-slot116-frozen.json build/private/phase1b-projection-slot116-target-rN` for `N=1,2,3`. The validator checks the run controls, frame markers, exact copy presence, count, base, slot and address. Private ROMs, saved state, raw logs and disassembly remain outside Git. No Sega CD BIOS/disc, BlastEm run, emulator-cycle timing, physical arcade board or physical Sega CD test was used here.
+
+**Unsupported:** prediction of the count and double-buffer base from earlier object ordering/frame state, identity of every object contributing to the count, and the subsequent Sub-X/Y-sprite use of this pulse's record. The immediate next bounded test should trace the count reset and preceding increments for one marker, then predict this object's count from earlier frame/object state without reading `$0CFCF0` at `$033E68`. The five-word Sega CD camera interface remains unchanged; this result alone does not establish a complete arcade-to-renderer handoff.
