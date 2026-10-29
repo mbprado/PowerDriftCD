@@ -19,7 +19,7 @@ INPUT = re.compile(r"PROJECTION_STATEFUL_INPUT pc=033D98 " + " ".join(
 OUTPUT = re.compile(r"PROJECTION_STATEFUL_OUTPUT pc=033E9A "
                     r"x=([0-9A-F]{4}) y=([0-9A-F]{4})")
 COPY = re.compile(r"PROJECTION_STATEFUL_COPY pc=033E8E "
-                  r"slot=([0-9A-F]{8}) x=([0-9A-F]{4}) y=([0-9A-F]{4}) "
+                  r"slot=([0-9A-F]{4,8}) x=([0-9A-F]{4}) y=([0-9A-F]{4}) "
                   r"oldx=([0-9A-F]{4}) oldy=([0-9A-F]{4}) "
                   r"listx=([0-9A-F]{4}) listy=([0-9A-F]{4}) "
                   r"listoldx=([0-9A-F]{4}) listoldy=([0-9A-F]{4})")
