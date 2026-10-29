@@ -106,7 +106,7 @@ local shared_watch_address = os.getenv("PDRIFT_SHARED_WATCH_ADDR")
 local shared_watch_until = tonumber(os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or "")
 assert(not os.getenv("PDRIFT_SHARED_WATCH_UNTIL") or
   (debug_mode == "shared" and shared_watch_address and shared_watch_until
-    and shared_watch_until >= 967 and shared_watch_until <= 975))
+    and shared_watch_until >= 967 and shared_watch_until <= 1000))
 assert(not os.getenv("PDRIFT_SHARED_WATCH_ADDR") or
   (debug_mode == "shared" and shared_watch_address
     and shared_watch_address >= 0x0c0000
@@ -118,7 +118,8 @@ assert(ysprite_watch_offset and ysprite_watch_offset % 16 == 0
 local ysprite_input_trace = os.getenv("PDRIFT_YSPRITE_INPUT_TRACE") == "1"
 assert(not ysprite_input_trace or debug_mode == "ysprite")
 local ysprite_input_slot = tonumber(os.getenv("PDRIFT_YSPRITE_INPUT_SLOT") or "C630", 16)
-assert(ysprite_input_slot == 0xa630 or ysprite_input_slot == 0xc630
+assert(ysprite_input_slot == 0xa630 or ysprite_input_slot == 0xc5d0
+  or ysprite_input_slot == 0xc630
   or ysprite_input_slot == 0xc6b0)
 local ysprite_sequence_trace = os.getenv("PDRIFT_YSPRITE_SEQUENCE_TRACE") == "1"
 assert(not ysprite_sequence_trace or debug_mode == "ysprite")
