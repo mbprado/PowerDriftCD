@@ -79,6 +79,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "projection" or debug_mode == "transform"
   or debug_mode == "bsprite" or debug_mode == "position_math"
   or debug_mode == "position_chain" or debug_mode == "position_preadd"
+  or debug_mode == "position_carry"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
 local position_increment_phase = os.getenv("PDRIFT_POSITION_INCREMENT_PHASE")
@@ -177,6 +178,7 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "projection" or debug_mode == "transform"
   or debug_mode == "bsprite" or debug_mode == "position_math"
   or debug_mode == "position_chain" or debug_mode == "position_preadd"
+  or debug_mode == "position_carry"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
@@ -383,12 +385,13 @@ emu.register_frame_done(function()
   if (ysprite_sequence_trace or debug_mode == "projection"
       or debug_mode == "transform" or debug_mode == "position_math"
       or debug_mode == "position_chain" or debug_mode == "position_preadd"
+      or debug_mode == "position_carry"
       or debug_mode == "position_offset"
       or debug_mode == "position_increment")
       and frames >= 960 and
       frames <= ((debug_mode == "projection" or debug_mode == "transform"
           or debug_mode == "position_math" or debug_mode == "position_chain"
-          or debug_mode == "position_preadd"
+          or debug_mode == "position_preadd" or debug_mode == "position_carry"
           or debug_mode == "position_offset" or debug_mode == "position_increment")
         and sequence_end or ysprite_sequence_end) then
     manager.machine.debugger:command(
@@ -831,6 +834,22 @@ emu.register_frame_done(function()
   if debug_mode == "position_chain" and frames == sequence_end then
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("POSITION_CHAIN_CLEARED," .. frames)
+  end
+  if debug_mode == "position_carry" and frames == 960 then
+    print(string.format("POSITION_CARRY_INIT,960,%04X",
+      ram_space:read_u16(0x0c0868)))
+    for _, item in ipairs({
+        { 0x34ef4, 'printf "POSITION_CARRY_TIMER pc=%06X timer=%04X\\n",pc,w@(a5+00a2);g' },
+        { 0x34fa4, 'printf "POSITION_CARRY_GUARD pc=%06X d3=%08X state80=%04X state7e=%04X\\n",pc,d3,w@(a5+80),w@(a5+7e);g' },
+      }) do
+      main_record_breakpoints[#main_record_breakpoints + 1] =
+        cpu_debug:bpset(item[1], "a5==c0840", item[2])
+    end
+    print("POSITION_CARRY_ARMED,input")
+  end
+  if debug_mode == "position_carry" and frames == sequence_end then
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("POSITION_CARRY_CLEARED," .. frames)
   end
   if debug_mode == "position_preadd" and frames == 960 then
     if position_preadd_phase == "input" or position_preadd_phase == "both" then
