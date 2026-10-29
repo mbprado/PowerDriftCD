@@ -100,6 +100,11 @@ assert(not position_chain_phase or (debug_mode == "position_chain"
   and (position_chain_phase == "input" or position_chain_phase == "output"
     or position_chain_phase == "both")))
 assert(debug_mode ~= "position_chain" or position_chain_phase)
+local optional_add_word = os.getenv("PDRIFT_POSITION_OPTIONAL_ADD")
+  and tonumber(os.getenv("PDRIFT_POSITION_OPTIONAL_ADD"), 16)
+assert(not os.getenv("PDRIFT_POSITION_OPTIONAL_ADD") or
+  (debug_mode == "position_chain" and state_load and optional_add_word
+    and optional_add_word >= 1 and optional_add_word <= 0x7fff))
 local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
 assert(not position_preadd_phase or (debug_mode == "position_preadd"
   and (position_preadd_phase == "input" or position_preadd_phase == "output"
@@ -415,6 +420,16 @@ emu.register_frame_done(function()
   if steer_pulse and frames == 960 then
     steering:set_value(steer_pulse)
     print(string.format("INPUT,960,steer-%d", steer_pulse))
+  end
+  if optional_add_word and frames == 960 then
+    local old80 = ram_space:read_u16(0x0c08c0)
+    local old7e = ram_space:read_u16(0x0c08be)
+    ram_space:write_u16(0x0c08c0, 1)
+    ram_space:write_u16(0x0c08be, optional_add_word)
+    assert(ram_space:read_u16(0x0c08c0) == 1)
+    assert(ram_space:read_u16(0x0c08be) == optional_add_word)
+    print(string.format("POSITION_OPTIONAL_ADD_OVERRIDE,960,%04X,%04X,0001,%04X",
+      old80, old7e, optional_add_word))
   end
   if state7a_delta_frame and frames == state7a_delta_frame then
     local address = 0x0c08ba
