@@ -190,6 +190,17 @@ assert(not os.getenv("PDRIFT_ROAD_RECORD_X_DELTA") or
     and road_record_x_delta and road_record_x_delta >= 0
     and road_record_x_delta <= 0x100 and not geometry_override_word
     and not projection_global_x_delta))
+local phase_lookup_delta = os.getenv("PDRIFT_PHASE_LOOKUP_DELTA")
+  and tonumber(os.getenv("PDRIFT_PHASE_LOOKUP_DELTA"), 16)
+local phase_lookup_frame = tonumber(os.getenv("PDRIFT_PHASE_LOOKUP_FRAME") or "963")
+assert(not os.getenv("PDRIFT_PHASE_LOOKUP_DELTA") or
+  (debug_mode == "shared" and shared_watch_address == 0x0c9a60
+    and phase_lookup_delta and phase_lookup_delta >= 0
+    and phase_lookup_delta <= 0x200 and phase_lookup_delta % 2 == 0
+    and phase_lookup_frame and phase_lookup_frame >= 961
+    and phase_lookup_frame <= 965 and not road_record_x_delta
+    and not projection_global_x_delta and not geometry_override_word))
+local phase_lookup_breakpoints = {}
 if debug_watch then
   assert(manager.machine.debugger)
   manager.machine.debugger.execution_state = "run"
@@ -701,6 +712,21 @@ emu.register_frame_done(function()
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print(string.format("WATCH_CLEARED,%d", frames))
+  end
+  if phase_lookup_delta and frames == phase_lookup_frame then
+    local entry = string.format(
+      'printf "PHASE_LOOKUP_ENTRY pc=%%06X old=%%04X\\n",pc,w@cea04;w@cea04=w@cea04+%x;printf "PHASE_LOOKUP_CHANGED value=%%04X\\n",w@cea04;g',
+      phase_lookup_delta)
+    local leave = string.format(
+      'printf "PHASE_LOOKUP_INDEX pc=%%06X index=%%04X changed=%%04X\\n",pc,d1,w@cea04;w@cea04=w@cea04-%x;printf "PHASE_LOOKUP_RESTORED value=%%04X\\n",w@cea04;g',
+      phase_lookup_delta)
+    phase_lookup_breakpoints[1] = cpu_debug:bpset(0x3454e, "1", entry)
+    phase_lookup_breakpoints[2] = cpu_debug:bpset(0x34b02, "a5==c0840", leave)
+    print(string.format("PHASE_LOOKUP_ARMED,%d,%X", frames, phase_lookup_delta))
+  end
+  if phase_lookup_delta and frames == phase_lookup_frame + 1 then
+    for _, index in ipairs(phase_lookup_breakpoints) do cpu_debug:bpclear(index) end
+    print(string.format("PHASE_LOOKUP_CLEARED,%d", frames))
   end
   if debug_mode == "position_math" and frames == 960 then
     if position_upstream_trace then
