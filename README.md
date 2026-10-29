@@ -12,6 +12,8 @@
 
 **Verified by execution, cross-CPU count boundary:** a [held-out pulse-124 test](docs/experiments/2026-10-29-shared-list-count-flow-result.md) predicted the target object's entry count `$0027` from the earlier reset and 39 main/Sub-Y writes in three fresh MAME runs. The count was `$0028` by the later pre-lock/copy stage, so entry count cannot be used directly as the list slot. Sub-Y interleaving and buffer selection still require a timed producer model.
 
+**Verified by execution, same-run lock order:** a [three-run pulse-124 audit](docs/experiments/2026-10-29-same-run-list-lock-result.md) observed Sub-Y acquire the shared lock and insert the `$0028` record between the target object's entry and main-CPU lock acquisition. Main copied at `$0028`; a predictive rule for when this interleaving happens on other schedules remains open.
+
 ## Principles
 - Original console hardware is the target; no expansion CPU/RAM or emulator-only shortcuts.
 - Arcade-feel first: banked tracks, elevation, camera motion, controls, opponents.
