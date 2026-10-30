@@ -14,6 +14,8 @@
 
 **Verified by execution, same-run lock order:** a [three-run pulse-124 audit](docs/experiments/2026-10-29-same-run-list-lock-result.md) observed Sub-Y acquire the shared lock and insert the `$0028` record between the target object's entry and main-CPU lock acquisition. Main copied at `$0028`; a predictive rule for when this interleaving happens on other schedules remains open.
 
+**Verified by execution, bounded interleaving prediction:** a [held-out pulse-132 test](docs/experiments/2026-10-30-suby-interleaving-prediction-result.md) used Sub-Y's CPU-local PC at main-object entry to predict five extra-record decisions and resulting copy counts/slots, matching 20/20 scored fields in each of three MAME runs. The tested output counts were the same as pulse 124, so a general scheduling or steering-to-slot rule remains **unsupported**. A CPU-local probe also corrected older Sub-Y `pc` labels that had shown the debugger-visible main CPU.
+
 ## Principles
 - Original console hardware is the target; no expansion CPU/RAM or emulator-only shortcuts.
 - Arcade-feel first: banked tracks, elevation, camera motion, controls, opponents.
