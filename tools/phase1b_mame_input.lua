@@ -154,7 +154,8 @@ assert(not projection_count_phase or debug_mode == "projection_count_flow")
 local projection_interleave_phase = os.getenv("PDRIFT_PROJECTION_INTERLEAVE_PHASE")
 assert(debug_mode ~= "projection_interleave" or
   (state_load and (projection_interleave_phase == "input"
-    or projection_interleave_phase == "output")))
+    or projection_interleave_phase == "output"
+    or projection_interleave_phase == "both")))
 assert(not projection_interleave_phase or debug_mode == "projection_interleave")
 local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
 assert(not position_preadd_phase or (debug_mode == "position_preadd"
@@ -254,10 +255,26 @@ local projection_lock_entry_seen = {}
 local projection_interleave_tap
 local projection_interleave_seen = {}
 local projection_lock_end = tonumber(os.getenv("PDRIFT_PROJECTION_LOCK_END") or "962")
+local projection_lock_start = tonumber(os.getenv("PDRIFT_PROJECTION_LOCK_START") or "960")
 assert(debug_mode ~= "projection_lock_interval"
-  or (projection_lock_end == 962 or projection_lock_end == 970))
+  or (projection_lock_start >= 960
+    and projection_lock_start < projection_lock_end
+    and projection_lock_end <= sequence_end))
 assert(not os.getenv("PDRIFT_PROJECTION_LOCK_END")
   or debug_mode == "projection_lock_interval")
+assert(not os.getenv("PDRIFT_PROJECTION_LOCK_START")
+  or debug_mode == "projection_lock_interval")
+local projection_interleave_start = tonumber(
+  os.getenv("PDRIFT_PROJECTION_INTERLEAVE_START") or "960")
+local projection_interleave_end = tonumber(
+  os.getenv("PDRIFT_PROJECTION_INTERLEAVE_END") or tostring(sequence_end))
+assert(debug_mode ~= "projection_interleave"
+  or (projection_interleave_start >= 960
+    and projection_interleave_start < projection_interleave_end
+    and projection_interleave_end <= sequence_end))
+assert((not os.getenv("PDRIFT_PROJECTION_INTERLEAVE_START")
+  and not os.getenv("PDRIFT_PROJECTION_INTERLEAVE_END"))
+  or debug_mode == "projection_interleave")
 local bsprite_write_tap
 local bsprite_stage_tap
 local bsprite_write_counts = {}
@@ -476,13 +493,15 @@ emu.register_frame_done(function()
     manager.machine.debugger:command(
       string.format('printf "PROJECTION_COUNT_FRAME,%d\\n"', frames))
   end
-  if debug_mode == "projection_lock_interval" and frames >= 960
+  if debug_mode == "projection_lock_interval"
+      and frames >= projection_lock_start
       and frames <= projection_lock_end then
     manager.machine.debugger:command(
       string.format('printf "PROJECTION_LOCK_FRAME,%d\\n"', frames))
   end
-  if debug_mode == "projection_interleave" and frames >= 960
-      and frames <= sequence_end then
+  if debug_mode == "projection_interleave"
+      and frames >= projection_interleave_start
+      and frames <= projection_interleave_end then
     manager.machine.debugger:command(
       string.format('printf "PROJECTION_INTERLEAVE_FRAME,%d\\n"', frames))
   end
@@ -1114,7 +1133,8 @@ emu.register_frame_done(function()
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("PROJECTION_COUNT_CLEARED," .. frames)
   end
-  if debug_mode == "projection_lock_interval" and frames == 960 then
+  if debug_mode == "projection_lock_interval"
+      and frames == projection_lock_start then
     local disasm_dir = os.getenv("PDRIFT_PROJECTION_LOCK_DISASM_DIR")
     if disasm_dir then
       local path = disasm_dir .. "/suby-list-writer.asm"
@@ -1181,7 +1201,7 @@ emu.register_frame_done(function()
       main_record_breakpoints[#main_record_breakpoints + 1] =
         cpu_debug:bpset(item[1], "a5==c1d00", action)
     end
-    print("PROJECTION_LOCK_ARMED,maincpu+subx+suby,960")
+    print("PROJECTION_LOCK_ARMED,maincpu+subx+suby," .. frames)
   end
   if debug_mode == "projection_lock_interval"
       and frames == projection_lock_end then
@@ -1191,8 +1211,10 @@ emu.register_frame_done(function()
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("PROJECTION_LOCK_CLEARED," .. frames)
   end
-  if debug_mode == "projection_interleave" and frames == 960 then
-    if projection_interleave_phase == "input" then
+  if debug_mode == "projection_interleave"
+      and frames == projection_interleave_start then
+    if projection_interleave_phase == "input"
+        or projection_interleave_phase == "both" then
       local maincpu = assert(manager.machine.devices[":maincpu"])
       local suby = assert(manager.machine.devices[":suby"])
       local suby_space = assert(suby.spaces["program"])
@@ -1211,7 +1233,9 @@ emu.register_frame_done(function()
               suby_space:read_u16(object + 0x30)))
           end
         end)
-    else
+    end
+    if projection_interleave_phase == "output"
+        or projection_interleave_phase == "both" then
       for _, item in ipairs({ { 0x33d1e, "ENTRY" },
                               { 0x33e70, "LOCKED" },
                               { 0x33e8e, "COPY" } }) do
@@ -1224,9 +1248,11 @@ emu.register_frame_done(function()
           cpu_debug:bpset(item[1], "a5==c1d00", format)
       end
     end
-    print("PROJECTION_INTERLEAVE_ARMED," .. projection_interleave_phase .. ",960")
+    print("PROJECTION_INTERLEAVE_ARMED," .. projection_interleave_phase
+      .. "," .. frames)
   end
-  if debug_mode == "projection_interleave" and frames == sequence_end then
+  if debug_mode == "projection_interleave"
+      and frames == projection_interleave_end then
     if projection_interleave_tap then projection_interleave_tap:remove() end
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("PROJECTION_INTERLEAVE_CLEARED," .. frames)

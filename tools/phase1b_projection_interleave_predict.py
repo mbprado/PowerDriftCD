@@ -8,7 +8,8 @@ import re
 from pathlib import Path
 
 
-MARKERS = (961, 963, 965, 967, 969)
+EARLY_MARKERS = (961, 963, 965, 967, 969)
+LATE_MARKERS = (981, 983)
 INPUT = re.compile(r"PROJECTION_INTERLEAVE_INPUT,(\d+),([0-9A-F]{6}),"
                    r"([0-9A-F]{8}),([0-9A-F]{4}),([0-9A-F]{2}),"
                    r"([0-9A-F]{4}),([0-9A-F]{4})")
@@ -28,28 +29,37 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def control(directory, phase, pulse):
+def control(directory, phase, pulse, start, end):
     path = directory / "phase1b-input.log"
     text = path.read_text(errors="replace")
     assert f"STEER_PULSE={pulse}" in text
-    assert f"PROJECTION_INTERLEAVE_ARMED,{phase},960" in text
-    assert "PROJECTION_INTERLEAVE_CLEARED,970" in text
+    assert f"PROJECTION_INTERLEAVE_ARMED,{phase},{start}" in text
+    assert f"PROJECTION_INTERLEAVE_CLEARED,{end}" in text
     assert "LUA ERROR" not in text
     return text, digest(path)
 
 
-def freeze(source, frozen, pulse):
+def freeze(source, frozen, pulse, profile):
     assert not frozen.exists(), "prediction already frozen"
-    text, control_sha = control(source, "input", pulse)
+    start, end, markers = (960, 970, EARLY_MARKERS) if profile == "early" \
+        else (980, 984, LATE_MARKERS)
+    text, control_sha = control(source, "input", pulse, start, end)
     debug_path = source / "debug.log"
     debug = debug_path.read_text(errors="replace")
     assert "PROJECTION_INTERLEAVE_OUTPUT" not in debug
     rows = INPUT.findall(text)
-    assert tuple(int(row[0]) for row in rows) == MARKERS
+    assert tuple(int(row[0]) for row in rows) == markers
     predictions = []
     for marker_text, pc_text, object_text, count_text, lock_text, fieldc, field30 in rows:
         pc = int(pc_text, 16)
-        if pc == 0x012932:
+        if profile == "late" and pc == 0x012A76:
+            assert int(object_text, 16) == 0xFFFF2140
+            assert int(fieldc, 16) != 0
+            delta, basis = 1, "later-code-path timing hypothesis"
+        elif profile == "late" and pc == 0x0129A8:
+            assert int(object_text, 16) == 0xFFFF2240
+            delta, basis = 1, "development signature"
+        elif pc == 0x012932:
             # New held-out PC: nonzero ($c,A0) enters the $129A8 path.
             assert int(fieldc, 16) != 0 and int(object_text, 16) == 0xFFFF2240
             delta, basis = 1, "code-path extrapolation"
@@ -65,7 +75,9 @@ def freeze(source, frozen, pulse):
                             "entry_count": count_text, "delta": delta,
                             "lock_count": f"{count + delta:04X}",
                             "copy_slot": f"{(count + delta) * 16:04X}"})
-    record = {"schema": 1, "source_commit": "3c4e904", "pulse": pulse,
+    record = {"schema": 1,
+              "source_commit": "3c4e904" if profile == "early" else "7587cfc",
+              "profile": profile, "pulse": pulse,
               "input_control_sha256": control_sha,
               "input_debug_sha256": digest(debug_path),
               "predictions": predictions}
@@ -74,10 +86,10 @@ def freeze(source, frozen, pulse):
                       "predicted_deltas": [row["delta"] for row in predictions]}, indent=2))
 
 
-def output_events(path):
+def output_events(path, markers):
     data = path.read_text(errors="replace")
     assert "Error in expression" not in data
-    events = {marker: {} for marker in MARKERS}
+    events = {marker: {} for marker in markers}
     marker = None
     for line in data.splitlines():
         found = FRAME.search(line)
@@ -95,9 +107,12 @@ def output_events(path):
 def validate(frozen, target):
     record = json.loads(frozen.read_text())
     assert record["schema"] == 1
-    _, control_sha = control(target, "output", record["pulse"])
+    profile = record.get("profile", "early")
+    start, end, markers = (960, 970, EARLY_MARKERS) if profile == "early" \
+        else (980, 984, LATE_MARKERS)
+    _, control_sha = control(target, "output", record["pulse"], start, end)
     debug_path = target / "debug.log"
-    events = output_events(debug_path)
+    events = output_events(debug_path, markers)
     errors = []
     scored = 0
     for row in record["predictions"]:
@@ -132,12 +147,13 @@ def main():
     freeze_command.add_argument("source", type=Path)
     freeze_command.add_argument("frozen", type=Path)
     freeze_command.add_argument("--pulse", type=int, required=True)
+    freeze_command.add_argument("--profile", choices=("early", "late"), default="early")
     check = commands.add_parser("validate")
     check.add_argument("frozen", type=Path)
     check.add_argument("target", type=Path)
     args = parser.parse_args()
     if args.action == "freeze":
-        freeze(args.source, args.frozen, args.pulse)
+        freeze(args.source, args.frozen, args.pulse, args.profile)
     else:
         validate(args.frozen, args.target)
 
