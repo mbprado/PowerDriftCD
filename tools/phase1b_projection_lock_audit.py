@@ -78,7 +78,7 @@ def audit(directory):
     assert not [row for row in events[locked_i + 1:copy_i]
                 if row["kind"] == "write" and row["field"] == "COUNT"]
     result = {"status": "PASS", "entry_count": f"{entry['count']:04X}",
-              "suby_count_write_pc": increment["pc"],
+              "watch_action_visible_pc": increment["pc"],
               "suby_incremented_count": f"{increment['data']:04X}",
               "main_lock_count": f"{locked['count']:04X}",
               "copy_count": f"{copy['count']:04X}",

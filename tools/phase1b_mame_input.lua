@@ -96,6 +96,7 @@ assert(not debug_mode or debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "projection_slot"
   or debug_mode == "projection_count_flow"
   or debug_mode == "projection_lock_interval"
+  or debug_mode == "projection_interleave"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment")
@@ -150,6 +151,11 @@ assert(debug_mode ~= "projection_count_flow" or
   (state_load and (projection_count_phase == "input"
     or projection_count_phase == "output")))
 assert(not projection_count_phase or debug_mode == "projection_count_flow")
+local projection_interleave_phase = os.getenv("PDRIFT_PROJECTION_INTERLEAVE_PHASE")
+assert(debug_mode ~= "projection_interleave" or
+  (state_load and (projection_interleave_phase == "input"
+    or projection_interleave_phase == "output")))
+assert(not projection_interleave_phase or debug_mode == "projection_interleave")
 local position_preadd_phase = os.getenv("PDRIFT_POSITION_PREADD_PHASE")
 assert(not position_preadd_phase or (debug_mode == "position_preadd"
   and (position_preadd_phase == "input" or position_preadd_phase == "output"
@@ -236,11 +242,22 @@ local debug_watch = debug_mode == "1" or debug_mode == "shared"
   or debug_mode == "projection_slot"
   or debug_mode == "projection_count_flow"
   or debug_mode == "projection_lock_interval"
+  or debug_mode == "projection_interleave"
   or debug_mode == "position_branch_writers"
   or debug_mode == "position_offset"
   or debug_mode == "position_increment"
 local cpu_debug = debug_watch and assert(manager.machine.devices[":maincpu"].debug)
 local watchpoints = {}
+local projection_lock_suby_tap
+local projection_lock_entry_tap
+local projection_lock_entry_seen = {}
+local projection_interleave_tap
+local projection_interleave_seen = {}
+local projection_lock_end = tonumber(os.getenv("PDRIFT_PROJECTION_LOCK_END") or "962")
+assert(debug_mode ~= "projection_lock_interval"
+  or (projection_lock_end == 962 or projection_lock_end == 970))
+assert(not os.getenv("PDRIFT_PROJECTION_LOCK_END")
+  or debug_mode == "projection_lock_interval")
 local bsprite_write_tap
 local bsprite_stage_tap
 local bsprite_write_counts = {}
@@ -460,9 +477,14 @@ emu.register_frame_done(function()
       string.format('printf "PROJECTION_COUNT_FRAME,%d\\n"', frames))
   end
   if debug_mode == "projection_lock_interval" and frames >= 960
-      and frames <= 962 then
+      and frames <= projection_lock_end then
     manager.machine.debugger:command(
       string.format('printf "PROJECTION_LOCK_FRAME,%d\\n"', frames))
+  end
+  if debug_mode == "projection_interleave" and frames >= 960
+      and frames <= sequence_end then
+    manager.machine.debugger:command(
+      string.format('printf "PROJECTION_INTERLEAVE_FRAME,%d\\n"', frames))
   end
   if debug_mode == "bsprite" and frames <= 982 then
     print(string.format("BSPRITE_FRAME,%d", frames))
@@ -1093,6 +1115,46 @@ emu.register_frame_done(function()
     print("PROJECTION_COUNT_CLEARED," .. frames)
   end
   if debug_mode == "projection_lock_interval" and frames == 960 then
+    local disasm_dir = os.getenv("PDRIFT_PROJECTION_LOCK_DISASM_DIR")
+    if disasm_dir then
+      local path = disasm_dir .. "/suby-list-writer.asm"
+      manager.machine.debugger:command(
+        string.format("dasm %s,12B20,90,0,:suby", path))
+      print("PROJECTION_LOCK_DISASM," .. path)
+      local caller_path = disasm_dir .. "/suby-list-caller.asm"
+      manager.machine.debugger:command(
+        string.format("dasm %s,12900,400,0,:suby", caller_path))
+      print("PROJECTION_LOCK_DISASM," .. caller_path)
+    end
+    if os.getenv("PDRIFT_PROJECTION_LOCK_SUBY_PC") == "1" then
+      local suby = assert(manager.machine.devices[":suby"])
+      local suby_space = assert(suby.spaces["program"])
+      projection_lock_suby_tap = suby_space:install_write_tap(
+        0x0cfcf0, 0x0cfcf1, "pdrift-projection-suby-count-pc",
+        function(offset, data, mask)
+          print(string.format("PROJECTION_SUBY_COUNT_TAP,%d,%06X,%08X,%08X,%08X",
+            frames, suby.state["CURPC"].value, offset, data, mask))
+        end)
+    end
+    if os.getenv("PDRIFT_PROJECTION_LOCK_ENTRY_TAP") == "1" then
+      local maincpu = assert(manager.machine.devices[":maincpu"])
+      local suby = assert(manager.machine.devices[":suby"])
+      local opcode_space = assert(maincpu.spaces["opcodes"]
+        or maincpu.spaces["program"])
+      projection_lock_entry_tap = opcode_space:install_read_tap(
+        0x33d1e, 0x33d1f, "pdrift-projection-entry-pc",
+        function(offset, data, mask)
+          if maincpu.state["A5"].value == 0x0c1d00
+              and not projection_lock_entry_seen[frames] then
+            projection_lock_entry_seen[frames] = true
+            print(string.format("PROJECTION_ENTRY_TAP,%d,%06X,%06X,%06X,%06X,%04X",
+              frames, maincpu.state["CURPC"].value,
+              suby.state["CURPC"].value,
+              suby.state["A0"].value, suby.state["A5"].value,
+              ram_space:read_u16(0x0cfcf0)))
+          end
+        end)
+    end
     for _, tag in ipairs({ "maincpu", "subx", "suby" }) do
       local device = assert(manager.machine.devices[":" .. tag])
       local debugger = assert(device.debug)
@@ -1121,10 +1183,53 @@ emu.register_frame_done(function()
     end
     print("PROJECTION_LOCK_ARMED,maincpu+subx+suby,960")
   end
-  if debug_mode == "projection_lock_interval" and frames == 962 then
+  if debug_mode == "projection_lock_interval"
+      and frames == projection_lock_end then
+    if projection_lock_suby_tap then projection_lock_suby_tap:remove() end
+    if projection_lock_entry_tap then projection_lock_entry_tap:remove() end
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
     for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
     print("PROJECTION_LOCK_CLEARED," .. frames)
+  end
+  if debug_mode == "projection_interleave" and frames == 960 then
+    if projection_interleave_phase == "input" then
+      local maincpu = assert(manager.machine.devices[":maincpu"])
+      local suby = assert(manager.machine.devices[":suby"])
+      local suby_space = assert(suby.spaces["program"])
+      projection_interleave_tap = maincpu.spaces["program"]:install_read_tap(
+        0x33d1e, 0x33d1f, "pdrift-projection-interleave-input",
+        function()
+          if maincpu.state["A5"].value == 0x0c1d00
+              and not projection_interleave_seen[frames] then
+            projection_interleave_seen[frames] = true
+            local object = suby.state["A0"].value & 0x1fffff
+            print(string.format("PROJECTION_INTERLEAVE_INPUT,%d,%06X,%06X,%04X,%02X,%04X,%04X",
+              frames, suby.state["CURPC"].value,
+              suby.state["A0"].value,
+              ram_space:read_u16(0x0cfcf0), ram_space:read_u8(0x0ceb43),
+              suby_space:read_u16(object + 0x0c),
+              suby_space:read_u16(object + 0x30)))
+          end
+        end)
+    else
+      for _, item in ipairs({ { 0x33d1e, "ENTRY" },
+                              { 0x33e70, "LOCKED" },
+                              { 0x33e8e, "COPY" } }) do
+        local format = item[2] == "COPY"
+          and 'printf "PROJECTION_INTERLEAVE_OUTPUT name=COPY pc=%06X count=%04X lock=%02X slot=%04X\\n",pc,w@cfcf0,b@ceb43,d0&ffff;g'
+          or string.format(
+            'printf "PROJECTION_INTERLEAVE_OUTPUT name=%s pc=%%06X count=%%04X lock=%%02X\\n",pc,w@cfcf0,b@ceb43;g',
+            item[2])
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          cpu_debug:bpset(item[1], "a5==c1d00", format)
+      end
+    end
+    print("PROJECTION_INTERLEAVE_ARMED," .. projection_interleave_phase .. ",960")
+  end
+  if debug_mode == "projection_interleave" and frames == sequence_end then
+    if projection_interleave_tap then projection_interleave_tap:remove() end
+    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    print("PROJECTION_INTERLEAVE_CLEARED," .. frames)
   end
   if debug_mode == "position_branch_writers" and
       frames == (state_load and 951 or 1) then
