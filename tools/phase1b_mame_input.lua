@@ -1156,6 +1156,21 @@ emu.register_frame_done(function()
             frames, suby.state["CURPC"].value, offset, data, mask))
         end)
     end
+    if os.getenv("PDRIFT_PROJECTION_LOCK_CHECKPOINTS") == "1" then
+      local suby = assert(manager.machine.devices[":suby"])
+      local suby_debug = assert(suby.debug)
+      for _, item in ipairs({ { 0x12a4e, "GUARD" },
+                              { 0x12a76, "MID" },
+                              { 0x12aba, "BRANCH" },
+                              { 0x12b3a, "TAS" },
+                              { 0x12b60, "COUNT" } }) do
+        local action = string.format(
+          'printf "PROJECTION_SUBY_CHECKPOINT name=%s count=%%04X lock=%%02X\n",w@cfcf0,b@ceb43;g',
+          item[2])
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          { suby_debug, suby_debug:bpset(item[1], "1", action) }
+      end
+    end
     if os.getenv("PDRIFT_PROJECTION_LOCK_ENTRY_TAP") == "1" then
       local maincpu = assert(manager.machine.devices[":maincpu"])
       local suby = assert(manager.machine.devices[":suby"])
@@ -1208,7 +1223,10 @@ emu.register_frame_done(function()
     if projection_lock_suby_tap then projection_lock_suby_tap:remove() end
     if projection_lock_entry_tap then projection_lock_entry_tap:remove() end
     for _, watch in ipairs(watchpoints) do watch[1]:wpclear(watch[2]) end
-    for _, index in ipairs(main_record_breakpoints) do cpu_debug:bpclear(index) end
+    for _, index in ipairs(main_record_breakpoints) do
+      if type(index) == "table" then index[1]:bpclear(index[2])
+      else cpu_debug:bpclear(index) end
+    end
     print("PROJECTION_LOCK_CLEARED," .. frames)
   end
   if debug_mode == "projection_interleave"

@@ -18,6 +18,8 @@
 
 **Verified by execution, later divergent-slot counterexample:** a [held-out pulse-104 test](docs/experiments/2026-10-30-late-interleaving-contrast-result.md) failed its frozen prediction at marker 981 in all three MAME runs: main copied slot `$0230`, while the model predicted `$0240`. A focused trace showed Sub-Y wrote the next records only after main released the lock. Marker 983 matched. Entry-time Sub-Y PC alone does not yet predict cross-CPU lock order across these schedules.
 
+**Verified by execution, lock checkpoints:** a [focused three-schedule trace](docs/experiments/2026-10-30-suby-lock-checkpoints.md) located Sub-Y guard, branch, lock and count events relative to main's copy. Pulse 104 had passed a guard checkpoint before main entry but still lost the lock; pulse 72 reached its guard later and won. These checkpoints explain the observed copy slots, but no earlier-state rule was found, so a new held-out prediction was not attempted.
+
 ## Principles
 - Original console hardware is the target; no expansion CPU/RAM or emulator-only shortcuts.
 - Arcade-feel first: banked tracks, elevation, camera motion, controls, opponents.
