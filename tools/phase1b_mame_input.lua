@@ -1171,6 +1171,23 @@ emu.register_frame_done(function()
           { suby_debug, suby_debug:bpset(item[1], "1", action) }
       end
     end
+    if os.getenv("PDRIFT_PROJECTION_LOCK_ARITH") == "1" then
+      local suby_debug = assert(manager.machine.devices[":suby"].debug)
+      for _, item in ipairs({ { 0x12a5e, "FIRST_WRITE" },
+                              { 0x12a62, "FIRST_READ" },
+                              { 0x12a90, "SECOND_WRITE" },
+                              { 0x12a94, "SECOND_RESULT" },
+                              { 0x12a9a, "SECOND_READ" },
+                              { 0x12aa0, "THIRD_WRITE" },
+                              { 0x12aa4, "THIRD_RESULT" },
+                              { 0x12aaa, "THIRD_READ" } }) do
+        local action = string.format(
+          'printf "PROJECTION_SUBY_ARITH name=%s count=%%04X lock=%%02X\n",w@cfcf0,b@ceb43;g',
+          item[2])
+        main_record_breakpoints[#main_record_breakpoints + 1] =
+          { suby_debug, suby_debug:bpset(item[1], "1", action) }
+      end
+    end
     if os.getenv("PDRIFT_PROJECTION_LOCK_ENTRY_TAP") == "1" then
       local maincpu = assert(manager.machine.devices[":maincpu"])
       local suby = assert(manager.machine.devices[":suby"])

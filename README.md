@@ -20,6 +20,8 @@
 
 **Verified by execution, lock checkpoints:** a [focused three-schedule trace](docs/experiments/2026-10-30-suby-lock-checkpoints.md) located Sub-Y guard, branch, lock and count events relative to main's copy. Pulse 104 had passed a guard checkpoint before main entry but still lost the lock; pulse 72 reached its guard later and won. These checkpoints explain the observed copy slots, but no earlier-state rule was found, so a new held-out prediction was not attempted.
 
+**Verified by execution, arithmetic-path ordering:** a [bounded follow-up](docs/experiments/2026-10-30-suby-arithmetic-order.md) traced Sub-Y's divider and multiplier code boundaries against the main lock. Pulse 104 completed its first divider access before main entry but reached its later arithmetic and lock steps only after main copied. The measured evidence is event order, not cycle duration; a predictive scheduling rule remains **unsupported**.
+
 ## Principles
 - Original console hardware is the target; no expansion CPU/RAM or emulator-only shortcuts.
 - Arcade-feel first: banked tracks, elevation, camera motion, controls, opponents.
