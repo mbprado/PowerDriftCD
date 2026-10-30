@@ -16,6 +16,8 @@
 
 **Verified by execution, bounded interleaving prediction:** a [held-out pulse-132 test](docs/experiments/2026-10-30-suby-interleaving-prediction-result.md) used Sub-Y's CPU-local PC at main-object entry to predict five extra-record decisions and resulting copy counts/slots, matching 20/20 scored fields in each of three MAME runs. The tested output counts were the same as pulse 124, so a general scheduling or steering-to-slot rule remains **unsupported**. A CPU-local probe also corrected older Sub-Y `pc` labels that had shown the debugger-visible main CPU.
 
+**Verified by execution, later divergent-slot counterexample:** a [held-out pulse-104 test](docs/experiments/2026-10-30-late-interleaving-contrast-result.md) failed its frozen prediction at marker 981 in all three MAME runs: main copied slot `$0230`, while the model predicted `$0240`. A focused trace showed Sub-Y wrote the next records only after main released the lock. Marker 983 matched. Entry-time Sub-Y PC alone does not yet predict cross-CPU lock order across these schedules.
+
 ## Principles
 - Original console hardware is the target; no expansion CPU/RAM or emulator-only shortcuts.
 - Arcade-feel first: banked tracks, elevation, camera motion, controls, opponents.
